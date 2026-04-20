@@ -268,12 +268,23 @@ class AirseekersApi:
         if data.get("code") == 0:
             _LOGGER.info("Command %s successful for %s", endpoint, sn)
             return True
-        _LOGGER.error("Command %s failed: %s", endpoint, data.get("msg"))
+        _LOGGER.error("Command %s failed: %s (payload was: %s)", endpoint, data.get("msg"), payload)
         return False
 
-    async def start_task(self, sn: str) -> bool:
-        """Start mowing task."""
-        return await self._send_command(API_TASK_START, sn)
+    async def start_task(self, sn: str, task_id: str = None, map_id: str = None, mode: int = 1) -> bool:
+        """Start mowing task.
+
+        Requires task_id and map_id from a scheduled task on the robot.
+        Mode: 1 = global mowing (default), other values may be available.
+        """
+        extra = {}
+        if task_id:
+            extra["task_id"] = task_id
+        if map_id:
+            extra["map_id"] = map_id
+        if mode is not None:
+            extra["mode"] = mode
+        return await self._send_command(API_TASK_START, sn, extra)
 
     async def stop_task(self, sn: str) -> bool:
         """Stop mowing task."""

@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-04-20
+
+### Fixed
+- **Critical**: Start Mowing button now works! The previous payload was
+  incomplete - the API requires `task_id`, `map_id`, and `mode` parameters
+  in addition to `sn`. Without these, the cloud accepted the request
+  (returning code 0) but never forwarded it to the robot.
+- `start_task()` now pulls task/map context from the scheduled tasks
+  list (populated by the coordinator) and includes them in the POST.
+- Improved error logging: failed commands now include the full payload
+  for easier debugging.
+
+### Requirements
+- A scheduled task must exist on the robot (created in the mobile app).
+  Without it, the Start button logs an error instead of silently doing
+  nothing.
+
 ## [1.0.1] - 2026-04-20
 
 ### Fixed

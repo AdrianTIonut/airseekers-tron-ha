@@ -85,7 +85,20 @@ class AirseekersStartButton(AirseekersBaseButton):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._api.start_task(self._sn)
+        tasks = self.coordinator.data.get("tasks", [])
+        if not tasks:
+            _LOGGER.error(
+                "No scheduled tasks found - cannot start mowing. "
+                "Create a task in the Airseekers mobile app first."
+            )
+            return
+        task = tasks[0]
+        await self._api.start_task(
+            self._sn,
+            task_id=task.get("id"),
+            map_id=task.get("map_id"),
+            mode=task.get("mode", 1),
+        )
         await self.coordinator.async_request_refresh()
 
 
