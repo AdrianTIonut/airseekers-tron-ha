@@ -113,7 +113,19 @@ class AirseekersApi:
             async with session.get(url, headers=self._headers()) as resp:
                 data = await resp.json()
                 if data.get("code") != 0:
-                    raise AirseekersApiError(f"Failed to get devices: {data.get('msg')}")
+                    msg = data.get('msg', '')
+                    # If token expired/invalid, try re-login once
+                    if 'illegal' in msg.lower() or 'credential' in msg.lower():
+                        _LOGGER.info("Token invalid, attempting re-login...")
+                        self._access_token = None
+                        await self.login()
+                        # Retry the request
+                        async with session.get(url, headers=self._headers()) as retry_resp:
+                            data = await retry_resp.json()
+                            if data.get("code") != 0:
+                                raise AirseekersApiError(f"Failed to get devices: {data.get('msg')}")
+                            return data.get("data", {}).get("list", [])
+                    raise AirseekersApiError(f"Failed to get devices: {msg}")
                 return data.get("data", {}).get("list", [])
         except aiohttp.ClientError as err:
             raise AirseekersApiError(f"Connection error: {err}") from err
@@ -259,10 +271,21 @@ class AirseekersApi:
         try:
             async with session.post(url, json=payload, headers=self._headers()) as resp:
                 data = await resp.json()
+                msg = data.get('msg', '')
+                
+                # If token expired/invalid, try re-login once
+                if data.get("code") != 0 and ('illegal' in msg.lower() or 'credential' in msg.lower()):
+                    _LOGGER.info("Token invalid, attempting re-login...")
+                    self._access_token = None
+                    await self.login()
+                    # Retry the command
+                    async with session.post(url, json=payload, headers=self._headers()) as retry_resp:
+                        data = await retry_resp.json()
+                
                 if data.get("code") == 0:
                     _LOGGER.info(f"Command {endpoint} successful for {sn}")
                     return True
-                _LOGGER.error(f"Command {endpoint} failed: {data.get('msg')}")
+                _LOGGER.error(f"Command {endpoint} failed: {msg}")
                 return False
         except aiohttp.ClientError as err:
             _LOGGER.error(f"Error sending command: {err}")
