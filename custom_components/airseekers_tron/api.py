@@ -1,5 +1,6 @@
 """Airseekers Tron API Client."""
 import logging
+import asyncio
 import aiohttp
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -52,8 +53,9 @@ class AirseekersApi:
         self._password = password
         self._access_token: Optional[str] = None
         self._refresh_token: Optional[str] = None
-        self._token_expiry: Optional[datetime] = None
         self._session: Optional[aiohttp.ClientSession] = None
+        # Lock to prevent multiple parallel re-login attempts
+        self._relogin_lock = asyncio.Lock()
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
@@ -73,11 +75,23 @@ class AirseekersApi:
             headers["Authorization"] = f"Bearer {self._access_token}"
         return headers
 
-    async def _ensure_authenticated(self) -> None:
-        """Ensure we have a valid token."""
-        if not self._access_token or (
-            self._token_expiry and datetime.now() >= self._token_expiry
-        ):
+    def _is_auth_error(self, status: int, data: dict) -> bool:
+        """Detect authentication errors from HTTP status or response body."""
+        if status == 401:
+            return True
+        if data.get("code", 0) != 0:
+            msg = data.get("msg", "").lower()
+            return any(
+                kw in msg
+                for kw in ("illegal", "credential", "token", "unauthorized", "login")
+            )
+        return False
+
+    async def _relogin(self) -> None:
+        """Re-login, protected by lock to prevent concurrent attempts."""
+        async with self._relogin_lock:
+            _LOGGER.warning("Token invalid, performing re-login...")
+            self._access_token = None
             await self.login()
 
     async def login(self) -> bool:
@@ -87,83 +101,99 @@ class AirseekersApi:
         payload = {"email": self._email, "password": self._password}
 
         try:
-            async with session.post(url, json=payload, headers={"Content-Type": "application/json"}) as resp:
+            async with session.post(
+                url, json=payload, headers={"Content-Type": "application/json"}
+            ) as resp:
                 data = await resp.json()
-                
+
                 if data.get("code") != 0:
-                    raise AirseekersAuthError(f"Login failed: {data.get('msg', 'Unknown error')}")
-                
+                    raise AirseekersAuthError(
+                        f"Login failed: {data.get('msg', 'Unknown error')}"
+                    )
+
                 self._access_token = data["data"]["access_token"]
                 self._refresh_token = data["data"].get("refresh_token")
-                self._token_expiry = datetime.now() + timedelta(hours=1, minutes=30)
-                
+
                 _LOGGER.debug("Successfully logged in to Airseekers API")
                 return True
-                
+
+        except aiohttp.ClientError as err:
+            raise AirseekersApiError(f"Connection error: {err}") from err
+
+    async def _get(self, path: str, params: dict = None) -> dict:
+        """GET request with automatic re-login on auth error."""
+        if not self._access_token:
+            await self.login()
+
+        session = await self._get_session()
+        url = f"{API_BASE_URL}{path}"
+
+        try:
+            async with session.get(url, params=params, headers=self._headers()) as resp:
+                data = await resp.json()
+                if self._is_auth_error(resp.status, data):
+                    await self._relogin()
+                    # Retry once with new token
+                    async with session.get(
+                        url, params=params, headers=self._headers()
+                    ) as retry:
+                        data = await retry.json()
+                        if self._is_auth_error(retry.status, data):
+                            raise AirseekersAuthError(
+                                "Re-login failed, credentials may be invalid"
+                            )
+                return data
+        except aiohttp.ClientError as err:
+            raise AirseekersApiError(f"Connection error: {err}") from err
+
+    async def _post(self, path: str, payload: dict) -> dict:
+        """POST request with automatic re-login on auth error."""
+        if not self._access_token:
+            await self.login()
+
+        session = await self._get_session()
+        url = f"{API_BASE_URL}{path}"
+
+        try:
+            async with session.post(url, json=payload, headers=self._headers()) as resp:
+                data = await resp.json()
+                if self._is_auth_error(resp.status, data):
+                    await self._relogin()
+                    # Retry once with new token
+                    async with session.post(
+                        url, json=payload, headers=self._headers()
+                    ) as retry:
+                        data = await retry.json()
+                        if self._is_auth_error(retry.status, data):
+                            raise AirseekersAuthError(
+                                "Re-login failed, credentials may be invalid"
+                            )
+                return data
         except aiohttp.ClientError as err:
             raise AirseekersApiError(f"Connection error: {err}") from err
 
     async def get_devices(self) -> List[Dict[str, Any]]:
         """Get list of devices."""
-        await self._ensure_authenticated()
-        session = await self._get_session()
-        url = f"{API_BASE_URL}{API_DEVICES}"
-
-        try:
-            async with session.get(url, headers=self._headers()) as resp:
-                data = await resp.json()
-                if data.get("code") != 0:
-                    msg = data.get('msg', '')
-                    # If token expired/invalid, try re-login once
-                    if 'illegal' in msg.lower() or 'credential' in msg.lower():
-                        _LOGGER.info("Token invalid, attempting re-login...")
-                        self._access_token = None
-                        await self.login()
-                        # Retry the request
-                        async with session.get(url, headers=self._headers()) as retry_resp:
-                            data = await retry_resp.json()
-                            if data.get("code") != 0:
-                                raise AirseekersApiError(f"Failed to get devices: {data.get('msg')}")
-                            return data.get("data", {}).get("list", [])
-                    raise AirseekersApiError(f"Failed to get devices: {msg}")
-                return data.get("data", {}).get("list", [])
-        except aiohttp.ClientError as err:
-            raise AirseekersApiError(f"Connection error: {err}") from err
+        data = await self._get(API_DEVICES)
+        if data.get("code") != 0:
+            raise AirseekersApiError(f"Failed to get devices: {data.get('msg')}")
+        return data.get("data", {}).get("list", [])
 
     async def get_device_config(self, sn: str) -> Dict[str, Any]:
         """Get device configuration (volume, light, night mode, etc)."""
-        await self._ensure_authenticated()
-        session = await self._get_session()
-        url = f"{API_BASE_URL}{API_CONFIG}?sn={sn}"
-
-        try:
-            async with session.get(url, headers=self._headers()) as resp:
-                data = await resp.json()
-                if data.get("code") != 0:
-                    return {}
-                return data.get("data", {}).get("configs", {})
-        except aiohttp.ClientError as err:
-            _LOGGER.error(f"Error getting config: {err}")
+        data = await self._get(API_CONFIG, params={"sn": sn})
+        if data.get("code") != 0:
             return {}
+        return data.get("data", {}).get("configs", {})
 
     async def set_config(self, sn: str, key: str, value: str) -> bool:
         """Set a configuration value."""
-        await self._ensure_authenticated()
-        session = await self._get_session()
-        url = f"{API_BASE_URL}{API_CONFIG}"
-        payload = {"sn": sn, key: value}
-
-        try:
-            async with session.post(url, json=payload, headers=self._headers()) as resp:
-                data = await resp.json()
-                if data.get("code") == 0:
-                    _LOGGER.info(f"Config {key}={value} set successfully for {sn}")
-                    return True
-                _LOGGER.error(f"Failed to set config: {data.get('msg')}")
-                return False
-        except aiohttp.ClientError as err:
-            _LOGGER.error(f"Error setting config: {err}")
-            return False
+        data = await self._post(API_CONFIG, {"sn": sn, key: value})
+        if data.get("code") == 0:
+            _LOGGER.info("Config %s=%s set successfully for %s", key, value, sn)
+            return True
+        _LOGGER.error("Failed to set config: %s", data.get("msg"))
+        return False
 
     async def set_volume(self, sn: str, volume: int) -> bool:
         """Set robot volume (0-10)."""
@@ -171,7 +201,9 @@ class AirseekersApi:
 
     async def set_light_brightness(self, sn: str, brightness: int) -> bool:
         """Set light brightness (0-100)."""
-        return await self.set_config(sn, "SetLightBrightness", str(max(0, min(100, brightness))))
+        return await self.set_config(
+            sn, "SetLightBrightness", str(max(0, min(100, brightness)))
+        )
 
     async def set_night_mode(self, sn: str, start_time: str, end_time: str) -> bool:
         """Set night mode schedule (HH:MM-HH:MM)."""
@@ -179,117 +211,65 @@ class AirseekersApi:
 
     async def set_4g_upload(self, sn: str, enabled: bool) -> bool:
         """Enable/disable 4G picture upload."""
-        return await self.set_config(sn, "Net4GAllowUploadPicture", "1" if enabled else "0")
+        return await self.set_config(
+            sn, "Net4GAllowUploadPicture", "1" if enabled else "0"
+        )
 
     async def get_device_tasks(self, sn: str) -> List[Dict[str, Any]]:
         """Get device scheduled tasks."""
-        await self._ensure_authenticated()
-        session = await self._get_session()
-        url = f"{API_BASE_URL}{API_TASK}?sn={sn}"
-
-        try:
-            async with session.get(url, headers=self._headers()) as resp:
-                data = await resp.json()
-                if data.get("code") != 0:
-                    return []
-                return data.get("data", {}).get("list", [])
-        except aiohttp.ClientError as err:
-            _LOGGER.error(f"Error getting tasks: {err}")
+        data = await self._get(API_TASK, params={"sn": sn})
+        if data.get("code") != 0:
             return []
+        return data.get("data", {}).get("list", [])
 
-    async def get_task_history(self, sn: str, page: int = 1, size: int = 10) -> Dict[str, Any]:
+    async def get_task_history(
+        self, sn: str, page: int = 1, size: int = 10
+    ) -> Dict[str, Any]:
         """Get task history with statistics."""
-        await self._ensure_authenticated()
-        session = await self._get_session()
-        url = f"{API_BASE_URL}{API_TASK_RECORD_LIST}?sn={sn}&page={page}&size={size}"
-
-        try:
-            async with session.get(url, headers=self._headers()) as resp:
-                data = await resp.json()
-                if data.get("code") != 0:
-                    return {}
-                return data.get("data", {})
-        except aiohttp.ClientError as err:
-            _LOGGER.error(f"Error getting task history: {err}")
+        data = await self._get(
+            API_TASK_RECORD_LIST, params={"sn": sn, "page": page, "size": size}
+        )
+        if data.get("code") != 0:
             return {}
+        return data.get("data", {})
 
-    async def get_notifications(self, sn: str, page: int = 1, size: int = 10) -> List[Dict[str, Any]]:
+    async def get_notifications(
+        self, sn: str, page: int = 1, size: int = 10
+    ) -> List[Dict[str, Any]]:
         """Get device notifications."""
-        await self._ensure_authenticated()
-        session = await self._get_session()
-        url = f"{API_BASE_URL}{API_NOTIFY_LIST}?sn={sn}&page={page}&size={size}"
-
-        try:
-            async with session.get(url, headers=self._headers()) as resp:
-                data = await resp.json()
-                if data.get("code") != 0:
-                    return []
-                return data.get("data", {}).get("list", [])
-        except aiohttp.ClientError as err:
-            _LOGGER.error(f"Error getting notifications: {err}")
+        data = await self._get(
+            API_NOTIFY_LIST, params={"sn": sn, "page": page, "size": size}
+        )
+        if data.get("code") != 0:
             return []
+        return data.get("data", {}).get("list", [])
 
     async def get_device_map(self, sn: str) -> List[Dict[str, Any]]:
         """Get device maps."""
-        await self._ensure_authenticated()
-        session = await self._get_session()
-        url = f"{API_BASE_URL}{API_DEVICE_MAP}?sn={sn}"
-
-        try:
-            async with session.get(url, headers=self._headers()) as resp:
-                data = await resp.json()
-                if data.get("code") != 0:
-                    return []
-                return data.get("data", [])
-        except aiohttp.ClientError as err:
-            _LOGGER.error(f"Error getting map: {err}")
+        data = await self._get(API_DEVICE_MAP, params={"sn": sn})
+        if data.get("code") != 0:
             return []
+        return data.get("data", [])
 
     async def get_rtk_info(self, sn: str) -> Dict[str, Any]:
         """Get RTK information."""
-        await self._ensure_authenticated()
-        session = await self._get_session()
-        url = f"{API_BASE_URL}{API_RTK_INFO}?sn={sn}"
+        data = await self._get(API_RTK_INFO, params={"sn": sn})
+        return data.get("data", {})
 
-        try:
-            async with session.get(url, headers=self._headers()) as resp:
-                data = await resp.json()
-                return data.get("data", {})
-        except aiohttp.ClientError as err:
-            _LOGGER.error(f"Error getting RTK info: {err}")
-            return {}
-
-    async def _send_command(self, endpoint: str, sn: str, extra_data: Dict = None) -> bool:
+    async def _send_command(
+        self, endpoint: str, sn: str, extra_data: Dict = None
+    ) -> bool:
         """Send a command to the device."""
-        await self._ensure_authenticated()
-        session = await self._get_session()
-        url = f"{API_BASE_URL}{endpoint}"
         payload = {"sn": sn}
         if extra_data:
             payload.update(extra_data)
 
-        try:
-            async with session.post(url, json=payload, headers=self._headers()) as resp:
-                data = await resp.json()
-                msg = data.get('msg', '')
-                
-                # If token expired/invalid, try re-login once
-                if data.get("code") != 0 and ('illegal' in msg.lower() or 'credential' in msg.lower()):
-                    _LOGGER.info("Token invalid, attempting re-login...")
-                    self._access_token = None
-                    await self.login()
-                    # Retry the command
-                    async with session.post(url, json=payload, headers=self._headers()) as retry_resp:
-                        data = await retry_resp.json()
-                
-                if data.get("code") == 0:
-                    _LOGGER.info(f"Command {endpoint} successful for {sn}")
-                    return True
-                _LOGGER.error(f"Command {endpoint} failed: {msg}")
-                return False
-        except aiohttp.ClientError as err:
-            _LOGGER.error(f"Error sending command: {err}")
-            return False
+        data = await self._post(endpoint, payload)
+        if data.get("code") == 0:
+            _LOGGER.info("Command %s successful for %s", endpoint, sn)
+            return True
+        _LOGGER.error("Command %s failed: %s", endpoint, data.get("msg"))
+        return False
 
     async def start_task(self, sn: str) -> bool:
         """Start mowing task."""
@@ -323,7 +303,7 @@ class AirseekersApi:
         """Determine device state from device info and notifications."""
         if device.get("online_status") != 1:
             return STATE_OFFLINE
-        
+
         if notifications:
             latest = notifications[0]
             notify_type = latest.get("notify_type")
@@ -335,5 +315,5 @@ class AirseekersApi:
                 return STATE_IDLE
             elif notify_type == 900002:  # Task start
                 return STATE_MOWING
-        
+
         return STATE_IDLE

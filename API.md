@@ -59,15 +59,15 @@ GET /api/web/device
   "data": {
     "list": [
       {
-        "id": "11911495336153088",
-        "sn": "1001014503003803",
-        "ip": "192.168.4.98",
-        "firmware_ver": "1.3.7",
+        "id": "00000000000000000",
+        "sn": "XXXXXXXXXXXXXXXX",
+        "ip": "192.168.X.X",
+        "firmware_ver": "X.X.X",
         "online_status": 1,
-        "latest_active_time": 1776700292,
-        "timezone_offset": 180,
-        "lock_status": 2,
-        "iccid": "89464283646104117783",
+        "latest_active_time": 0000000000,
+        "timezone_offset": 0,
+        "lock_status": 0,
+        "iccid": "XXXXXXXXXXXXXXXXXXXX",
         "nrtk_bound": true,
         "nrtk_available": true,
         "func_list": ["ai_mowing", "remote_handle", "nrtk"]
@@ -96,7 +96,7 @@ GET /api/web/device/config?sn={serial_number}
       "Net4GAllowUploadPicture": "1",
       "SetDarkMode": "22:00-06:00",
       "SetLightBrightness": "0",
-      "SetVolume": "8"
+      "SetVolume": "5"
     },
     "is_online_data": true
   }
@@ -110,7 +110,7 @@ POST /api/web/device/config
 Content-Type: application/json
 
 {
-  "sn": "1001014503003803",
+  "sn": "XXXXXXXXXXXXXXXX",
   "SetVolume": "5"
 }
 ```
@@ -134,7 +134,7 @@ POST /api/web/device/task/start
 Content-Type: application/json
 
 {
-  "sn": "1001014503003803"
+  "sn": "XXXXXXXXXXXXXXXX"
 }
 ```
 
@@ -145,7 +145,7 @@ POST /api/web/device/task/stop
 Content-Type: application/json
 
 {
-  "sn": "1001014503003803"
+  "sn": "XXXXXXXXXXXXXXXX"
 }
 ```
 
@@ -156,7 +156,7 @@ POST /api/web/device/task/pause
 Content-Type: application/json
 
 {
-  "sn": "1001014503003803"
+  "sn": "XXXXXXXXXXXXXXXX"
 }
 ```
 
@@ -167,7 +167,7 @@ POST /api/web/device/task/resume
 Content-Type: application/json
 
 {
-  "sn": "1001014503003803"
+  "sn": "XXXXXXXXXXXXXXXX"
 }
 ```
 
@@ -178,7 +178,7 @@ POST /api/web/device/task/dock
 Content-Type: application/json
 
 {
-  "sn": "1001014503003803"
+  "sn": "XXXXXXXXXXXXXXXX"
 }
 ```
 
@@ -191,8 +191,8 @@ POST /api/web/device/lock
 Content-Type: application/json
 
 {
-  "sn": "1001014503003803",
-  "password": "1234"
+  "sn": "XXXXXXXXXXXXXXXX",
+  "password": "0000"
 }
 ```
 
@@ -203,8 +203,8 @@ POST /api/web/device/unlock
 Content-Type: application/json
 
 {
-  "sn": "1001014503003803",
-  "password": "1234"
+  "sn": "XXXXXXXXXXXXXXXX",
+  "password": "0000"
 }
 ```
 
@@ -222,9 +222,9 @@ GET /api/web/device/map?sn={serial_number}
   "code": 0,
   "data": [
     {
-      "mapId": "25319660004134912",
-      "mapName": "Map-2",
-      "nick_name": "hala-fara-margi",
+      "mapId": "00000000000000000",
+      "mapName": "Map-1",
+      "nick_name": "my-lawn",
       "geoData": {...}
     }
   ]
@@ -254,23 +254,23 @@ GET /api/web/device/task-record/list?sn={serial_number}&page=1&size=10
   "data": {
     "list": [
       {
-        "id": "25654622587801600",
-        "task_id": "25425404640186368_1776481200",
-        "start_time": 1776535495,
-        "mow_area": 1379,
-        "total_area": 2940,
-        "duration": 18956,
+        "id": "00000000000000000",
+        "task_id": "00000000000000000_0000000000",
+        "start_time": 0000000000,
+        "mow_area": 0,
+        "total_area": 0,
+        "duration": 0,
         "result": 2,
         "track_file": "https://...",
         "map_url": "https://..."
       }
     ],
     "summary": {
-      "total_area": 4969,
-      "total_duration": 146150,
-      "total_count": 10
+      "total_area": 0,
+      "total_duration": 0,
+      "total_count": 0
     },
-    "total": 10
+    "total": 0
   }
 }
 ```
@@ -328,7 +328,7 @@ The following features require MQTT connection which is not available through th
 
 The MQTT broker is hosted on AWS IoT:
 ```
-Broker: a26yx9tpysif9b-ats.iot.eu-central-1.amazonaws.com:8883
+Broker: <account-prefix>-ats.iot.eu-central-1.amazonaws.com:8883
 Protocol: MQTT over TLS with client certificates
 ```
 
