@@ -1,0 +1,34 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Airseekers Tron",
+        "description": "Enter your Airseekers account credentials",
+        "data": {
+          "email": "Email",
+          "password": "Password",
+          "scan_interval": "Update interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid email or password",
+      "cannot_connect": "Cannot connect to Airseekers API",
+      "no_devices": "No devices found in your account",
+      "unknown": "Unknown error occurred"
+    },
+    "abort": {
+      "already_configured": "Account is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Airseekers Tron Options",
+        "data": {
+          "scan_interval": "Update interval (seconds)"
+        }
+      }
+    }
+  }
+}
