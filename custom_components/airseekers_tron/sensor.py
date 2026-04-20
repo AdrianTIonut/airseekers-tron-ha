@@ -179,7 +179,8 @@ class AirseekersLastActiveSensor(AirseekersBaseSensor):
     def native_value(self) -> datetime | None:
         timestamp = self.coordinator.data.get("last_active")
         if timestamp:
-            return datetime.fromtimestamp(timestamp)
+            from datetime import timezone
+            return datetime.fromtimestamp(timestamp, tz=timezone.utc)
         return None
 
 
