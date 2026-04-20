@@ -271,11 +271,22 @@ class AirseekersApi:
         _LOGGER.error("Command %s failed: %s (payload was: %s)", endpoint, data.get("msg"), payload)
         return False
 
-    async def start_task(self, sn: str, task_id: str = None, map_id: str = None, mode: int = 1) -> bool:
+    async def start_task(
+        self,
+        sn: str,
+        task_id: str = None,
+        map_id: str = None,
+        mode: int = 1,
+        task_units: list = None,
+    ) -> bool:
         """Start mowing task.
 
-        Requires task_id and map_id from a scheduled task on the robot.
-        Mode: 1 = global mowing (default), other values may be available.
+        The Airseekers API requires the full task context to start mowing:
+        - task_id: ID of the scheduled task
+        - map_id: ID of the map to use
+        - mode: mowing mode (1 = global)
+        - task_units: list of area definitions with cut settings
+          (without this, the API returns code -107 "operation not allowed")
         """
         extra = {}
         if task_id:
@@ -284,6 +295,8 @@ class AirseekersApi:
             extra["map_id"] = map_id
         if mode is not None:
             extra["mode"] = mode
+        if task_units:
+            extra["task_units"] = task_units
         return await self._send_command(API_TASK_START, sn, extra)
 
     async def stop_task(self, sn: str) -> bool:

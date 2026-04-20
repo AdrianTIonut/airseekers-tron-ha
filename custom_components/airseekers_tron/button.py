@@ -98,6 +98,7 @@ class AirseekersStartButton(AirseekersBaseButton):
             task_id=task.get("id"),
             map_id=task.get("map_id"),
             mode=task.get("mode", 1),
+            task_units=task.get("task_units"),
         )
         await self.coordinator.async_request_refresh()
 
