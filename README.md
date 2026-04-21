@@ -4,6 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/release/AdrianTIonut/airseekers-tron-ha.svg)](https://github.com/AdrianTIonut/airseekers-tron-ha/releases)
 [![License](https://img.shields.io/github/license/AdrianTIonut/airseekers-tron-ha.svg)](LICENSE)
 ![Airseekers Tron](https://cdn.hiconsumption.com/wp-content/uploads/2024/04/Tron-360-Vision-Robotic-Lawn-Mower-0-Hero.jpg)
+![GitHub release downloads](https://img.shields.io/github/downloads/AdrianTIonut/airseekers-tron-ha/total)
 Unofficial Home Assistant custom integration for **Airseekers Tron** robotic lawn mowers.
 
 Communicates with the official Airseekers cloud REST API (discovered through reverse engineering of the Airseekers mobile app).
@@ -300,4 +301,3 @@ This is an **unofficial** integration. It is not affiliated with, endorsed by, o
 
 MIT License — see [LICENSE](LICENSE) file.
 
-![GitHub release downloads](https://img.shields.io/github/downloads/AdrianTIonut/airseekers-tron-ha/total)
