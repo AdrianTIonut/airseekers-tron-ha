@@ -30,6 +30,8 @@ async def async_setup_entry(
         entities.extend([
             AirseekersOnlineSensor(coordinator, sn),
             AirseekersNrtkSensor(coordinator, sn),
+            AirseekersOtaAvailableSensor(coordinator, sn),
+            AirseekersChargingSensor(coordinator, sn),
         ])
 
     async_add_entities(entities)
@@ -102,3 +104,38 @@ class AirseekersNrtkSensor(AirseekersBaseBinarySensor):
         return {
             "nrtk_bound": self.coordinator.data.get("nrtk_bound"),
         }
+
+
+class AirseekersOtaAvailableSensor(AirseekersBaseBinarySensor):
+    """Binary sensor for firmware/MCU OTA availability."""
+
+    _attr_device_class = BinarySensorDeviceClass.UPDATE
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator: AirseekersDataCoordinator, sn: str) -> None:
+        super().__init__(coordinator, sn, "OTA Available", "ota_available")
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self.coordinator.data.get("mcu_upgrade_available", False))
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "current_mcu": self.coordinator.data.get("mcu_current_version"),
+            "target_mcu": self.coordinator.data.get("mcu_target_version"),
+        }
+
+
+class AirseekersChargingSensor(AirseekersBaseBinarySensor):
+    """Binary sensor: true if robot is on dock / charging."""
+
+    _attr_device_class = BinarySensorDeviceClass.BATTERY_CHARGING
+
+    def __init__(self, coordinator: AirseekersDataCoordinator, sn: str) -> None:
+        super().__init__(coordinator, sn, "Charging", "charging")
+
+    @property
+    def is_on(self) -> bool:
+        state = self.coordinator.data.get("state")
+        return state == "charging"

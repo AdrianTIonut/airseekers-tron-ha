@@ -52,7 +52,7 @@ CONF_PASSWORD = "password"
 CONF_SCAN_INTERVAL = "scan_interval"
 
 # Defaults
-DEFAULT_SCAN_INTERVAL = 60  # seconds
+DEFAULT_SCAN_INTERVAL = 10  # seconds - full-status gives real-time data
 
 # Device states
 STATE_IDLE = "idle"

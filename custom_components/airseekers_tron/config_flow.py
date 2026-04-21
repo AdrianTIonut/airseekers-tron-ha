@@ -72,7 +72,7 @@ class AirseekersConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_PASSWORD): str,
                     vol.Optional(
                         CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
-                    ): vol.All(vol.Coerce(int), vol.Range(min=30, max=600)),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=5, max=600)),
                 }
             ),
             errors=errors,
@@ -108,7 +108,7 @@ class AirseekersOptionsFlow(config_entries.OptionsFlow):
                         default=self._config_entry.data.get(
                             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                         ),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=30, max=600)),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=5, max=600)),
                 }
             ),
         )

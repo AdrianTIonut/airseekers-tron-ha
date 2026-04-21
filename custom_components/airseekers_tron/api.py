@@ -200,10 +200,9 @@ class AirseekersApi:
         return await self.set_config(sn, "SetVolume", str(max(0, min(10, volume))))
 
     async def set_light_brightness(self, sn: str, brightness: int) -> bool:
-        """Set light brightness (0-100)."""
-        return await self.set_config(
-            sn, "SetLightBrightness", str(max(0, min(100, brightness)))
-        )
+        """Set light brightness (10-100). Uses fill-light-setting endpoint."""
+        brightness = max(10, min(100, int(brightness)))
+        return await self.set_fill_light(sn, brightness, enabled=brightness > 0)
 
     async def set_night_mode(self, sn: str, start_time: str, end_time: str) -> bool:
         """Set night mode schedule (HH:MM-HH:MM)."""
@@ -255,6 +254,56 @@ class AirseekersApi:
         """Get RTK information."""
         data = await self._get(API_RTK_INFO, params={"sn": sn})
         return data.get("data", {})
+
+    async def get_full_status(self, sn: str) -> Dict[str, Any]:
+        """Get full device status (battery, task, position, RTK, network, versions).
+
+        This is the KEY endpoint for real-time state. Returns nested dicts:
+        - battery_status: battery_percentage, battery_temperature, battery_error
+        - task_status: state, task_id, map_id, run_time, remaining_area, total_area
+        - rtk_status: localization_state, robot_pose_lat/lon/yaw, num_satellites, rtk_status
+        - rtk_info: rtk_snr, rtk_quality, rtk_version
+        - net_info: wifi_ssid, wifi_dbm, wireless_4g_ip, sim_active
+        - sensor_status, online_status
+        - version: chassis_board, cutter_board, rtk_board, mower_package, voice_version
+        - upgrade_status, upgrade_mcu_status, voice_upgrade_status
+        """
+        data = await self._get("/api/web/device/full-status", params={"sn": sn})
+        if data.get("code") != 0:
+            return {}
+        return data.get("data", {}) or {}
+
+    async def set_fill_light(self, sn: str, brightness: int, enabled: bool = True) -> bool:
+        """Set the fill light (real endpoint, not /config which only stores in cloud).
+
+        Returns code 309 if device offline or busy.
+        """
+        data = await self._post(
+            "/api/web/device/fill-light-setting",
+            {"sn": sn, "lightBrightness": int(brightness), "fillLightSwitch": enabled},
+        )
+        if data.get("code") == 0:
+            _LOGGER.info("Fill light set: brightness=%s enabled=%s", brightness, enabled)
+            return True
+        _LOGGER.warning("Fill light set failed: %s", data.get("msg"))
+        return False
+
+    async def rtk_reboot(self, sn: str) -> bool:
+        """Reboot RTK base station."""
+        data = await self._post("/api/web/device/rtk-reboot", {"sn": sn})
+        return data.get("code") == 0
+
+    async def clean_warnings(self, sn: str) -> bool:
+        """Clear warning notifications on the device."""
+        data = await self._post("/api/web/device/clean-warn", {"sn": sn})
+        return data.get("code") == 0
+
+    async def switch_map(self, sn: str, map_id: str) -> bool:
+        """Switch the active map."""
+        data = await self._post(
+            "/api/web/device/map/switch", {"sn": sn, "map_id": map_id}
+        )
+        return data.get("code") == 0
 
     async def _send_command(
         self, endpoint: str, sn: str, extra_data: Dict = None
@@ -323,21 +372,52 @@ class AirseekersApi:
         """Unlock the device."""
         return await self._send_command(API_DEVICE_UNLOCK, sn, {"password": password})
 
-    def determine_state(self, device: Dict, notifications: List[Dict]) -> str:
-        """Determine device state from device info and notifications."""
+    def determine_state(
+        self,
+        device: Dict,
+        notifications: List[Dict],
+        full_status: Dict = None,
+    ) -> str:
+        """Determine device state - prefer full_status.task_status, fallback to notifications."""
         if device.get("online_status") != 1:
             return STATE_OFFLINE
 
-        if notifications:
-            latest = notifications[0]
-            notify_type = latest.get("notify_type")
-            if notify_type == 900013:  # Charging complete
-                return STATE_IDLE
-            elif notify_type == 900011:  # Charging start
-                return STATE_CHARGING
-            elif notify_type == 900001:  # Task complete
-                return STATE_IDLE
-            elif notify_type == 900002:  # Task start
+        # Primary source: full_status.task_status.state (live from device)
+        if full_status:
+            task_status = full_status.get("task_status") or {}
+            task_state = task_status.get("state")
+            # state values observed: 0=idle, 1=mowing/active, 2=paused, others may exist
+            if task_state == 1:
                 return STATE_MOWING
+            if task_state == 2:
+                return STATE_PAUSED
 
+            # Check if robot is charging via battery temp / upgrade status or notifications
+            battery = full_status.get("battery_status") or {}
+            if battery.get("battery_error") and battery.get("battery_error") != 0:
+                # still return idle/charging based on context
+                pass
+
+        # Fallback: derive state from recent notifications (class 9 only)
+        state_notifs = [n for n in (notifications or []) if n.get("notify_class") == 9]
+        if not state_notifs:
+            return STATE_IDLE
+
+        latest = state_notifs[0]
+        notify_type = latest.get("notify_type")
+
+        if notify_type in (900002, 900006, 900061):
+            return STATE_MOWING
+        if notify_type == 900010:
+            return STATE_PAUSED
+        if notify_type == 900011:
+            return STATE_CHARGING
+        if notify_type == 900013:
+            return STATE_IDLE
+        if notify_type == 900105:
+            return STATE_DOCKING
+        if notify_type in (900001, 900101, 900036):
+            return STATE_IDLE
+        if notify_type in (900055, 900018, 900062):
+            return STATE_PAUSED
         return STATE_IDLE

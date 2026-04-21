@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2026-04-20
+
+### Added
+- **Real-time device state** via `/api/web/device/full-status` endpoint.
+  The state detection now uses the actual `task_status.state` reported
+  by the robot instead of parsing notifications.
+- **Battery sensor** (percentage) with proper `battery` device_class.
+- **Battery Temperature sensor** (°C).
+- **Task progress sensor** (calculated % based on remaining vs total area).
+- **Current task sensors**: Run Time, Remaining Area, Current Total Area.
+- **Position sensors**: Latitude/Longitude (as `lat, lon` string with
+  separate attributes), Heading (degrees).
+- **RTK sensors**: RTK Quality (NARROW_INT, etc), Satellites (count +
+  used), LoRa Signal (dBm, disabled by default).
+- **Network sensors**: WiFi Signal (dBm), WiFi SSID, 4G IP (most
+  disabled by default to reduce noise).
+- **Version sensors** for each board: Chassis Board, Cutter Board,
+  RTK Board (disabled by default).
+- **Binary sensors**: Charging (true when robot is docked), OTA
+  Available (true when MCU upgrade is pending).
+- **RTK Reboot button** (disabled by default).
+- **Clear Warnings button** (disabled by default).
+
+### Fixed
+- **Light brightness command** now uses correct endpoint
+  `/api/web/device/fill-light-setting` with `lightBrightness` field.
+  The old `/config` endpoint was read-only despite returning `code 0`.
+- **Default scan interval** lowered to 10s (was 60s); minimum lowered to
+  5s since `full-status` returns fresh data on every call.
+
+### Notes
+- MQTT direct connection was researched but not implemented: the
+  `iot-cert` endpoint returns a cert whose IAM policy restricts the
+  client_id to a single value used by the robot itself, causing
+  session takeover conflicts when a separate client connects.
+
+## [1.0.4] - 2026-04-20
+
+### Fixed
+- State detection now correctly reflects the robot's activity. Previous
+  version only handled 4 notify types; now handles all relevant ones:
+  `900006`, `900061` (mowing), `900010` (paused), `900011` (charging),
+  `900013` (idle after charge), `900101` (terminated), `900036` (task
+  failed), `900105` (returning to dock), `900055`, `900018`, `900062`
+  (auto-paused for positioning/lift/escape errors).
+- State detection now filters out communication errors (`notify_class: 8`
+  like "RTK signal lost") which don't reflect work state.
+
 ## [1.0.3] - 2026-04-20
 
 ### Fixed

@@ -111,7 +111,7 @@ class AirseekersVolume(AirseekersBaseNumber):
 
 
 class AirseekersLightBrightness(AirseekersBaseNumber):
-    """Number entity for robot light brightness (0-100)."""
+    """Number entity for robot light brightness (10-100)."""
 
     def __init__(self, coordinator, api, sn: str) -> None:
         """Initialize the entity."""
@@ -120,7 +120,7 @@ class AirseekersLightBrightness(AirseekersBaseNumber):
             name="Light Brightness",
             key="light_brightness",
             icon="mdi:brightness-6",
-            min_value=0,
+            min_value=10,
             max_value=100,
             step=10,
             unit="%"

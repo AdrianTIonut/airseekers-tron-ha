@@ -31,6 +31,8 @@ async def async_setup_entry(
             AirseekersPauseButton(coordinator, api, sn),
             AirseekersResumeButton(coordinator, api, sn),
             AirseekersDockButton(coordinator, api, sn),
+            AirseekersRtkRebootButton(coordinator, api, sn),
+            AirseekersCleanWarningsButton(coordinator, api, sn),
         ])
 
     async_add_entities(entities)
@@ -152,4 +154,30 @@ class AirseekersDockButton(AirseekersBaseButton):
     async def async_press(self) -> None:
         """Handle the button press."""
         await self._api.dock(self._sn)
+        await self.coordinator.async_request_refresh()
+
+
+class AirseekersRtkRebootButton(AirseekersBaseButton):
+    """Button to reboot RTK base station."""
+
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator, api, sn: str) -> None:
+        super().__init__(coordinator, api, sn, "Reboot RTK", "rtk_reboot", "mdi:restart")
+
+    async def async_press(self) -> None:
+        await self._api.rtk_reboot(self._sn)
+        await self.coordinator.async_request_refresh()
+
+
+class AirseekersCleanWarningsButton(AirseekersBaseButton):
+    """Button to clear device warnings."""
+
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator, api, sn: str) -> None:
+        super().__init__(coordinator, api, sn, "Clear Warnings", "clean_warn", "mdi:bell-off")
+
+    async def async_press(self) -> None:
+        await self._api.clean_warnings(self._sn)
         await self.coordinator.async_request_refresh()
