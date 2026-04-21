@@ -299,3 +299,5 @@ This is an **unofficial** integration. It is not affiliated with, endorsed by, o
 ## License
 
 MIT License — see [LICENSE](LICENSE) file.
+
+![GitHub release downloads](https://img.shields.io/github/downloads/AdrianTIonut/airseekers-tron-ha/total)
