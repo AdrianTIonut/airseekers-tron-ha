@@ -3,12 +3,10 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/AdrianTIonut/airseekers-tron-ha.svg)](https://github.com/AdrianTIonut/airseekers-tron-ha/releases)
 [![License](https://img.shields.io/github/license/AdrianTIonut/airseekers-tron-ha.svg)](LICENSE)
-
 ![Airseekers Tron](https://cdn.hiconsumption.com/wp-content/uploads/2024/04/Tron-360-Vision-Robotic-Lawn-Mower-0-Hero.jpg)
-
 Unofficial Home Assistant custom integration for **Airseekers Tron** robotic lawn mowers.
 
-Communicates with the official Airseekers cloud REST API.
+Communicates with the official Airseekers cloud REST API (discovered through reverse engineering of the Airseekers mobile app).
 
 ## Features
 
@@ -24,12 +22,8 @@ Communicates with the official Airseekers cloud REST API.
 - 🔕 **Clear Warnings** (dismiss device alerts)
 
 ### ⚙️ Adjustable Settings
-- 🔊 **Volume** (0-10) *
-- 💡 **Light Brightness** (0-100%) *
 - 🌙 **Night Mode** on/off
-- 🔒 **Device Lock** on/off
-
-> \* **Important:** Volume and light brightness can only be applied when the robot is **idle on the dock**. The Airseekers cloud API returns a timeout (code 309) when the robot is mowing, paused, or otherwise busy. This is a cloud API limitation, not an integration bug. Set these before starting a task.
+- 🔒 **Device Lock** on/off (anti-theft)
 
 ### 🔋 Battery & Task Live (from full-status endpoint)
 - Battery level (%) and battery temperature (°C)
@@ -123,10 +117,10 @@ Many entities are **disabled by default** to reduce dashboard clutter. Enable th
 | `button.*_clear_warnings` | Clear warnings (disabled by default) |
 
 ### Numbers (settings)
-| Entity | Range |
-|---|---|
-| `number.*_volume` | 0-10 |
-| `number.*_light_brightness` | 0-100 |
+| Entity | Range | Working? |
+|---|---|---|
+| `number.*_volume` | 0-10 | ❌ Does not apply (see Limitations) |
+| `number.*_light_brightness` | 0-100 | ❌ Does not apply (see Limitations) |
 
 ### Sensors
 | Entity | Description |
@@ -253,7 +247,7 @@ entities:
 
 ## Known Limitations
 
-- **Light brightness and volume** only apply when the robot is idle on the dock (cloud API limitation)
+- **Volume and Light Brightness** cannot be controlled reliably from this integration. Even though the entities exist in HA, the Airseekers cloud REST API returns timeout errors (code 309) when you try to change these values — the setting is accepted by the cloud but never actually applied to the robot. The mobile app works because it uses a direct MQTT connection with protobuf messages (not yet reverse-engineered). The `number.*_volume` and `number.*_light_brightness` entities are kept for future compatibility when MQTT support is added.
 - **Camera streaming** is not implemented (would require WebRTC + MQTT)
 - **Remote control / joystick** is not implemented (would require real-time MQTT)
 - **Per-zone settings** (cutting height, interval, angle) are stored per-map in the Airseekers cloud and not adjustable through the REST API
@@ -274,11 +268,6 @@ entities:
 - Check robot is powered on and has network (WiFi/4G)
 - Open Airseekers app — does it show online?
 - Check your WiFi/4G connection in the app
-
-### Light/Volume settings don't apply
-- This is expected when the robot is mowing, paused, or docking
-- Wait until robot is idle on dock and try again
-- Check HA logs for "device is busy" warnings
 
 ### App disconnects when HA is running
 - This is a known limitation: Airseekers cloud only allows one active session per account. HA and mobile app share the same session credentials. Opening the mobile app may temporarily log out HA (and vice-versa). HA reconnects automatically within seconds.
