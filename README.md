@@ -4,119 +4,186 @@
 [![GitHub Release](https://img.shields.io/github/release/AdrianTIonut/airseekers-tron-ha.svg)](https://github.com/AdrianTIonut/airseekers-tron-ha/releases)
 [![License](https://img.shields.io/github/license/AdrianTIonut/airseekers-tron-ha.svg)](LICENSE)
 
-Home Assistant custom integration for **Airseekers Tron** robotic lawn mowers.
+![Airseekers Tron](https://cdn.hiconsumption.com/wp-content/uploads/2024/04/Tron-360-Vision-Robotic-Lawn-Mower-0-Hero.jpg)
 
-![Airseekers Tron](https://www.airseekers.com/cdn/shop/files/TRON-1.png?v=1701234567&width=400)
+Unofficial Home Assistant custom integration for **Airseekers Tron** robotic lawn mowers.
+
+Communicates with the official Airseekers cloud REST API.
 
 ## Features
 
-### Controls
-- ▶️ **Start** mowing
-- ⏸️ **Pause** mowing  
-- ⏹️ **Stop** mowing
-- 🔄 **Resume** mowing
-- 🏠 **Return to dock**
-- 🔒 **Lock/Unlock** robot
+### 🤖 Lawn Mower Entity
+- Full `lawn_mower` entity with start/pause/dock controls (works with HA's lawn mower card)
 
-### Settings (adjustable from HA)
-- 🔊 **Volume** (0-10)
-- 💡 **Light Brightness** (0-100%)
-- 🌙 **Night Mode** schedule
+### 🎛️ Controls (Buttons)
+- ▶️ **Start Mowing** — begins mowing the active map
+- ⏸️ **Pause** / **Resume**
+- ⏹️ **Stop**
+- 🏠 **Return to Dock**
+- 🔄 **Reboot RTK** (reboots the RTK base station)
+- 🔕 **Clear Warnings** (dismiss device alerts)
 
-### Sensors
-- 📊 **State** (idle, mowing, charging, offline)
-- 🌐 **Online Status**
-- 📍 **IP Address**
-- 📡 **RTK Status**
-- 🗺️ **Maps Count**
-- 📅 **Scheduled Tasks**
-- 🔔 **Last Notification**
-- ⚙️ **Firmware Version**
-- ⏱️ **Last Active Time**
+### ⚙️ Adjustable Settings
+- 🔊 **Volume** (0-10) *
+- 💡 **Light Brightness** (0-100%) *
+- 🌙 **Night Mode** on/off
+- 🔒 **Device Lock** on/off
 
-### Statistics
-- 🌿 **Total Mowed Area** (m²)
-- ⏰ **Total Mowing Time** (hours)
-- 📈 **Total Tasks Completed**
+> \* **Important:** Volume and light brightness can only be applied when the robot is **idle on the dock**. The Airseekers cloud API returns a timeout (code 309) when the robot is mowing, paused, or otherwise busy. This is a cloud API limitation, not an integration bug. Set these before starting a task.
+
+### 🔋 Battery & Task Live (from full-status endpoint)
+- Battery level (%) and battery temperature (°C)
+- Task state, progress %, run time
+- Remaining area (m²), current task total area (m²)
+- Charging indicator (binary sensor)
+
+### 📍 Position & RTK
+- Robot GPS position (latitude, longitude)
+- Heading (degrees)
+- RTK quality (NARROW_INT, FLOAT, etc.)
+- Satellites (count + used)
+- LoRa signal strength
+- Localization state
+
+### 🌐 Network
+- WiFi signal (dBm) and SSID
+- 4G IP address and SIM status
+
+### ⚙️ Hardware Versions
+- Mower package version (firmware)
+- Chassis board, Cutter board, RTK board versions
+- Voice pack version and language
+- OTA Available indicator (binary sensor)
+
+### 🗺️ Maps & Tasks
+- List of saved maps (count + names)
+- Number of scheduled tasks
+- Active map indicator
+
+### 📊 Statistics
+- Total mowed area (m²)
+- Total mowing time (hours)
+- Total completed tasks
+
+### 🔔 Device Info
+- Online status
+- NRTK availability (location-based)
+- IP address
+- Last notification content + type
+- Last active timestamp
 
 ## Installation
 
-### HACS (Recommended)
+### Via HACS (Custom Repository)
 
-1. Open HACS in Home Assistant
-2. Click on "Integrations"
-3. Click the three dots in the top right corner
-4. Select "Custom repositories"
-5. Add this repository URL: `https://github.com/AdrianTIonut/airseekers-tron-ha`
-6. Select category: "Integration"
-7. Click "Add"
-8. Search for "Airseekers Tron" and install it
-9. Restart Home Assistant
+1. Open **HACS** in Home Assistant
+2. Go to **Integrations**
+3. Click the three dots in the top right corner → **Custom repositories**
+4. Add repository: `https://github.com/AdrianTIonut/airseekers-tron-ha`
+5. Category: **Integration**
+6. Click **Add**
+7. Search for **"Airseekers Tron"** → Download
+8. **Restart Home Assistant**
 
 ### Manual Installation
 
-1. Download the latest release from [GitHub Releases](https://github.com/AdrianTIonut/airseekers-tron-ha/releases)
-2. Extract and copy the `custom_components/airseekers_tron` folder to your Home Assistant's `custom_components` directory
+1. Download the latest release from [Releases](https://github.com/AdrianTIonut/airseekers-tron-ha/releases)
+2. Copy `custom_components/airseekers_tron` to your HA `custom_components` folder
 3. Restart Home Assistant
 
 ## Configuration
 
-1. Go to **Settings** → **Devices & Services**
+1. **Settings** → **Devices & Services**
 2. Click **Add Integration**
 3. Search for **Airseekers Tron**
-4. Enter your Airseekers account credentials (email and password)
-5. Set the update interval (default: 60 seconds)
+4. Enter your Airseekers account credentials (email and password — same as mobile app)
+5. (Optional) Adjust update interval — default is 10 seconds (minimum 5)
 
 ## Entities Created
 
-| Entity Type | Name | Description |
-|-------------|------|-------------|
-| `lawn_mower` | Airseekers Tron | Main entity with start/pause/dock controls |
-| `button` | Start Mowing | Start a mowing task |
-| `button` | Stop | Stop current task |
-| `button` | Pause | Pause current task |
-| `button` | Resume | Resume paused task |
-| `button` | Return to Dock | Send robot to charging station |
-| `number` | Volume | Robot voice volume (0-10) |
-| `number` | Light Brightness | LED brightness (0-100%) |
-| `sensor` | State | Current robot state |
-| `sensor` | Last Notification | Latest notification message |
-| `sensor` | Scheduled Tasks | Number of scheduled tasks |
-| `sensor` | Maps | Number of saved maps |
-| `sensor` | Firmware | Current firmware version |
-| `sensor` | Last Active | Last activity timestamp |
-| `sensor` | Total Mowed Area | Cumulative mowed area |
-| `sensor` | Total Mowing Time | Cumulative mowing time |
-| `sensor` | Total Tasks Completed | Total completed tasks |
-| `sensor` | IP Address | Robot's local IP address |
-| `sensor` | Night Mode Schedule | Night mode time range |
-| `binary_sensor` | Online | Robot online status |
-| `binary_sensor` | RTK Available | RTK positioning available |
-| `switch` | Night Mode | Enable/disable night mode |
-| `switch` | Lock Mode | Enable/disable anti-theft lock |
-| `select` | Mowing Mode | Select mowing mode |
+Many entities are **disabled by default** to reduce dashboard clutter. Enable the ones you want from **Settings → Devices → Airseekers Tron → "Entities not shown"**.
+
+<details>
+<summary>Full list of entities</summary>
+
+### Lawn Mower
+| Entity | Description |
+|---|---|
+| `lawn_mower.airseekers_tron_XXXXXX` | Main entity with start/pause/dock |
+
+### Buttons
+| Entity | Description |
+|---|---|
+| `button.*_start_mowing` | Start mowing |
+| `button.*_stop` | Stop current task |
+| `button.*_pause` | Pause |
+| `button.*_resume` | Resume |
+| `button.*_return_to_dock` | Go to dock |
+| `button.*_reboot_rtk` | Reboot RTK (disabled by default) |
+| `button.*_clear_warnings` | Clear warnings (disabled by default) |
+
+### Numbers (settings)
+| Entity | Range |
+|---|---|
+| `number.*_volume` | 0-10 |
+| `number.*_light_brightness` | 0-100 |
+
+### Sensors
+| Entity | Description |
+|---|---|
+| `sensor.*_state` | idle, mowing, paused, charging, offline |
+| `sensor.*_battery` | Battery percentage |
+| `sensor.*_battery_temperature` | °C |
+| `sensor.*_task_progress` | % complete |
+| `sensor.*_current_task_run_time` | HH:MM:SS |
+| `sensor.*_remaining_area` | m² |
+| `sensor.*_current_task_total_area` | m² |
+| `sensor.*_rtk_quality` | NARROW_INT, FLOAT, etc. |
+| `sensor.*_satellites` | Count |
+| `sensor.*_position` | `lat, lon` |
+| `sensor.*_heading` | degrees (disabled by default) |
+| `sensor.*_lora_signal` | dBm (disabled by default) |
+| `sensor.*_wifi_signal` | dBm |
+| `sensor.*_wifi_ssid` | SSID (disabled by default) |
+| `sensor.*_ip_address` | Local IP (disabled by default) |
+| `sensor.*_4g_ip` | 4G IP (disabled by default) |
+| `sensor.*_firmware` | Package version |
+| `sensor.*_chassis_board` | (disabled by default) |
+| `sensor.*_cutter_board` | (disabled by default) |
+| `sensor.*_rtk_board` | (disabled by default) |
+| `sensor.*_last_notification` | Latest notification text |
+| `sensor.*_last_active` | Timestamp |
+| `sensor.*_night_mode_schedule` | Time range (disabled by default) |
+| `sensor.*_maps` | Saved maps count (disabled by default) |
+| `sensor.*_scheduled_tasks` | Tasks count (disabled by default) |
+| `sensor.*_total_mowed_area` | m² (cumulative) |
+| `sensor.*_total_mowing_time` | hours (cumulative) |
+| `sensor.*_total_tasks_completed` | (disabled by default) |
+
+### Binary Sensors
+| Entity | Description |
+|---|---|
+| `binary_sensor.*_online` | Robot online |
+| `binary_sensor.*_rtk_available` | RTK positioning available |
+| `binary_sensor.*_charging` | On dock charging |
+| `binary_sensor.*_ota_available` | Firmware upgrade pending (disabled by default) |
+
+### Switches
+| Entity | Description |
+|---|---|
+| `switch.*_night_mode` | Enable/disable night mode |
+| `switch.*_lock_mode` | Anti-theft lock |
+
+### Selects
+| Entity | Description |
+|---|---|
+| `select.*_mowing_mode` | Select mowing mode |
+
+</details>
 
 ## Example Automations
 
-### Start mowing at sunrise
-```yaml
-automation:
-  - alias: "Start mowing at sunrise"
-    trigger:
-      - platform: sun
-        event: sunrise
-        offset: "+01:00:00"
-    condition:
-      - condition: state
-        entity_id: binary_sensor.airseekers_tron_XXXXXX_online
-        state: "on"
-    action:
-      - service: lawn_mower.start_mowing
-        target:
-          entity_id: lawn_mower.airseekers_tron_XXXXXX
-```
-
-### Send notification when mowing complete
+### Notify when mowing is complete
 ```yaml
 automation:
   - alias: "Mowing complete notification"
@@ -129,22 +196,42 @@ automation:
       - service: notify.mobile_app
         data:
           title: "Lawn Mower"
-          message: "Mowing complete! Robot is back at the dock."
+          message: "Mowing complete! Robot back on dock."
 ```
 
-### Reduce volume at night
+### Low battery alert
 ```yaml
 automation:
-  - alias: "Reduce mower volume at night"
+  - alias: "Tron low battery"
     trigger:
-      - platform: time
-        at: "22:00:00"
+      - platform: numeric_state
+        entity_id: sensor.airseekers_tron_XXXXXX_battery
+        below: 20
     action:
-      - service: number.set_value
-        target:
-          entity_id: number.airseekers_tron_XXXXXX_volume
+      - service: notify.mobile_app
         data:
-          value: 2
+          message: "Tron battery at {{ states('sensor.airseekers_tron_XXXXXX_battery') }}%"
+```
+
+### Start mowing at sunrise (if idle and on dock)
+```yaml
+automation:
+  - alias: "Auto mow at sunrise"
+    trigger:
+      - platform: sun
+        event: sunrise
+        offset: "+01:00:00"
+    condition:
+      - condition: state
+        entity_id: binary_sensor.airseekers_tron_XXXXXX_charging
+        state: "on"
+      - condition: numeric_state
+        entity_id: sensor.airseekers_tron_XXXXXX_battery
+        above: 80
+    action:
+      - service: lawn_mower.start_mowing
+        target:
+          entity_id: lawn_mower.airseekers_tron_XXXXXX
 ```
 
 ## Lovelace Card Example
@@ -154,58 +241,72 @@ type: entities
 title: Airseekers Tron
 entities:
   - entity: lawn_mower.airseekers_tron_XXXXXX
+  - entity: sensor.airseekers_tron_XXXXXX_battery
   - entity: sensor.airseekers_tron_XXXXXX_state
+  - entity: sensor.airseekers_tron_XXXXXX_task_progress
+  - entity: sensor.airseekers_tron_XXXXXX_current_task_run_time
+  - entity: sensor.airseekers_tron_XXXXXX_remaining_area
+  - entity: sensor.airseekers_tron_XXXXXX_rtk_quality
+  - entity: binary_sensor.airseekers_tron_XXXXXX_charging
   - entity: binary_sensor.airseekers_tron_XXXXXX_online
-  - entity: number.airseekers_tron_XXXXXX_volume
-  - entity: number.airseekers_tron_XXXXXX_light_brightness
-  - entity: sensor.airseekers_tron_XXXXXX_total_mowed_area
-  - entity: sensor.airseekers_tron_XXXXXX_total_mowing_time
 ```
-
-## API Documentation
-
-This integration uses the Airseekers Cloud REST API. For detailed API documentation, see [API.md](API.md).
 
 ## Known Limitations
 
-- **Battery level** is not available through the REST API (requires MQTT connection)
-- **Camera streaming** is not supported (requires WebRTC/MQTT)
-- **Remote control** (joystick) is not available (requires real-time MQTT)
-- **Area-specific settings** (height, interval, angle) are stored per-map and not adjustable via API
+- **Light brightness and volume** only apply when the robot is idle on the dock (cloud API limitation)
+- **Camera streaming** is not implemented (would require WebRTC + MQTT)
+- **Remote control / joystick** is not implemented (would require real-time MQTT)
+- **Per-zone settings** (cutting height, interval, angle) are stored per-map in the Airseekers cloud and not adjustable through the REST API
+- **No real-time push** — data is refreshed via polling (default 10s). Real-time MQTT was investigated but is not feasible: the IoT certificate restricts client IDs to a single value used by the robot itself, causing session conflicts.
 
 ## Troubleshooting
 
 ### Integration not showing up
-- Make sure you've restarted Home Assistant after installation
-- Check the Home Assistant logs for errors
+- Restart Home Assistant completely (not just reload)
+- Check HA logs for errors (Settings → System → Logs)
+- Make sure HACS download completed
 
 ### Authentication failed
-- Verify your email and password are correct
-- Make sure you can log in to the Airseekers mobile app
+- Verify email/password — same as Airseekers mobile app
+- If you recently changed password, update in integration settings
 
-### Robot shows as offline
-- Check that your robot is powered on and connected to the internet
-- Verify the robot appears online in the Airseekers mobile app
+### Robot shows offline
+- Check robot is powered on and has network (WiFi/4G)
+- Open Airseekers app — does it show online?
+- Check your WiFi/4G connection in the app
+
+### Light/Volume settings don't apply
+- This is expected when the robot is mowing, paused, or docking
+- Wait until robot is idle on dock and try again
+- Check HA logs for "device is busy" warnings
+
+### App disconnects when HA is running
+- This is a known limitation: Airseekers cloud only allows one active session per account. HA and mobile app share the same session credentials. Opening the mobile app may temporarily log out HA (and vice-versa). HA reconnects automatically within seconds.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions welcome! If you have an Airseekers Tron and want to help:
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork the repo
+2. Create your feature branch
+3. Commit your changes
+4. Push and open a Pull Request
+
+**Wanted contributions:**
+- MQTT protobuf reverse engineering (would enable instant light/volume control during mowing)
+- Camera WebRTC stream integration
+- Per-zone settings (map geometry API)
+- Additional language translations
 
 ## Credits
 
-- Developed through reverse engineering of the Airseekers mobile app
-- Thanks to the Home Assistant community
+- Integration developed through reverse engineering of the Airseekers mobile app
+- Inspired by similar HA integrations for robotic mowers (Husqvarna Automower, Segway Navimow)
 
 ## Disclaimer
 
-This is an unofficial integration and is not affiliated with, endorsed by, or connected to Airseekers in any way. Use at your own risk.
+This is an **unofficial** integration. It is not affiliated with, endorsed by, or connected to Airseekers in any way. Use at your own risk.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License — see [LICENSE](LICENSE) file.
