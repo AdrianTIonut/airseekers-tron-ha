@@ -1,4 +1,5 @@
 """Data coordinator for Airseekers Tron."""
+import asyncio
 import logging
 from datetime import timedelta
 from typing import Any, Dict
@@ -62,6 +63,26 @@ class AirseekersDataCoordinator(DataUpdateCoordinator):
             # Task history (for statistics)
             history = await self.api.get_task_history(self.device_sn, size=5)
 
+            # NEW: warranty, NRTK availability, voice pack update, last task record,
+            # latest firmware. Fetched in parallel to minimise round trips; each
+            # endpoint returns {} on error.
+            (
+                warranty,
+                ext_warranty,
+                nrtk_supported,
+                voice_info,
+                last_task,
+                firmware_latest,
+            ) = await asyncio.gather(
+                self.api.get_warranty(self.device_sn),
+                self.api.get_extended_warranty(self.device_sn),
+                self.api.get_nrtk_supported(self.device_sn),
+                self.api.get_voice_version(self.device_sn),
+                self.api.get_task_record_latest(self.device_sn),
+                self.api.get_firmware_latest(self.device_sn),
+                return_exceptions=False,
+            )
+
             # Determine state - uses full_status as primary, notifications as fallback
             state = self.api.determine_state(device, notifications, full_status)
 
@@ -81,6 +102,9 @@ class AirseekersDataCoordinator(DataUpdateCoordinator):
             sensor_status = full_status.get("sensor_status") or {}
             upgrade_status = full_status.get("upgrade_status") or {}
             upgrade_mcu = full_status.get("upgrade_mcu_status") or {}
+            upgrade_voice = full_status.get("voice_upgrade_status") or {}
+            explore_info = full_status.get("explore_mapping_info") or {}
+            nrtk_info = device.get("nrtk_info") or {}
 
             return {
                 # Raw payloads (for entities that need full access)
@@ -166,6 +190,72 @@ class AirseekersDataCoordinator(DataUpdateCoordinator):
                 "total_mowed_area": history.get("summary", {}).get("total_area", 0),
                 "total_mowing_time": history.get("summary", {}).get("total_duration", 0),
                 "total_task_count": history.get("summary", {}).get("total_count", 0),
+                # ------------------------------------------------------------------
+                # NEW in this version — previously discovered via APK dump but
+                # never surfaced as entities.
+                # ------------------------------------------------------------------
+                # Task status extras
+                "task_type": task_status.get("type"),
+                "task_update_time": task_status.get("update_time"),
+                # RTK extras (rtk_info from full_status — separate from rtk/address-info)
+                "rtk_version": rtk_info.get("rtk_version"),
+                "rtk_base_sn": rtk_info.get("rtk_sn"),
+                "rtk_channel_current": rtk_info.get("rtk_channel"),
+                "rtk_addr_current": rtk_info.get("rtk_addr"),
+                # Altitude (rtk_status)
+                "robot_altitude": rtk_status.get("robot_pose_altitude"),
+                # Sensor status raw (bitfield)
+                "sensor_status_raw": sensor_status.get("status"),
+                # Firmware/MCU/voice OTA status
+                "mcu_upgrade_progress": upgrade_mcu.get("progress"),
+                "mcu_upgrade_state": upgrade_mcu.get("state"),
+                "mcu_upgrade_step": upgrade_mcu.get("step"),
+                "mcu_upgrade_type": upgrade_mcu.get("type"),
+                "voice_upgrade_progress": upgrade_voice.get("progress"),
+                "voice_upgrade_state": upgrade_voice.get("state"),
+                "voice_upgrade_step": upgrade_voice.get("step"),
+                # Explore / mapping session
+                "explore_state": explore_info.get("state"),
+                "explore_boundary_poses": explore_info.get("boundary_pose_size"),
+                "explore_trajectory_poses": explore_info.get("trajectory_pose_size"),
+                # NRTK subscription details (from device list)
+                "nrtk_bind_type": nrtk_info.get("bind_type"),
+                "nrtk_active_status": nrtk_info.get("active_status"),
+                "nrtk_trial_available": nrtk_info.get("trial_available"),
+                "nrtk_trial_duration": nrtk_info.get("trial_duration"),
+                "nrtk_trial_remaining": nrtk_info.get("trial_remaining_time"),
+                "timezone_offset": device.get("timezone_offset"),
+                # Warranty (new endpoints)
+                "warranty_start": warranty.get("start_at"),
+                "warranty_end": warranty.get("end_at"),
+                "has_extended_warranty": bool(ext_warranty),
+                "extended_warranty_start": ext_warranty.get("start_at") if ext_warranty else None,
+                "extended_warranty_end": ext_warranty.get("end_at") if ext_warranty else None,
+                # NRTK supported (location-based)
+                "nrtk_area_supported": bool(nrtk_supported.get("available"))
+                    if isinstance(nrtk_supported, dict) else False,
+                # Voice pack upgrade
+                "voice_current_version": voice_info.get("current_version"),
+                "voice_new_version": voice_info.get("new_version"),
+                "voice_upgradable": bool(voice_info.get("upgradable")),
+                "voice_change_log": voice_info.get("change_log"),
+                "last_task_record": last_task if isinstance(last_task, dict) and last_task.get("id") else None,
+                # Latest firmware (from /firmware/latest). Code 407 = already latest.
+                "firmware_latest_version": firmware_latest.get("version"),
+                "firmware_current_version": firmware_latest.get("current_version"),
+                "firmware_upgradable": bool(firmware_latest.get("upgradable")),
+                "firmware_force_upgrade": bool(firmware_latest.get("force_upgrade")),
+                "firmware_change_log": firmware_latest.get("change_log") or "",
+                # Legacy task awaiting resume (task_status)
+                "legacy_task_id": task_status.get("legacy_task_id") or "",
+                # WiFi IP (separate from 4G)
+                "wifi_ip": net_info.get("wifi_ip") or "",
+                # RTK addr/channel currently in use
+                "rtk_addr_active": rtk_info.get("rtk_addr"),
+                "rtk_channel_active": rtk_info.get("rtk_channel"),
+                "rtk_quality_numeric": rtk_info.get("rtk_quality"),
+                # Upgrade status step (already have progress/state)
+                "firmware_upgrade_step": upgrade_status.get("step"),
             }
 
         except AirseekersApiError as err:

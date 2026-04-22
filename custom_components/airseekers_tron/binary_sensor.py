@@ -32,6 +32,11 @@ async def async_setup_entry(
             AirseekersNrtkSensor(coordinator, sn),
             AirseekersOtaAvailableSensor(coordinator, sn),
             AirseekersChargingSensor(coordinator, sn),
+            # v1.2 additions from gap analysis vs. APK dump
+            AirseekersFirmwareUpgradableSensor(coordinator, sn),
+            AirseekersVoiceUpgradableSensor(coordinator, sn),
+            AirseekersLegacyTaskSensor(coordinator, sn),
+            AirseekersDeviceLockedSensor(coordinator, sn),
         ])
 
     async_add_entities(entities)
@@ -75,12 +80,10 @@ class AirseekersOnlineSensor(AirseekersBaseBinarySensor):
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
 
     def __init__(self, coordinator: AirseekersDataCoordinator, sn: str) -> None:
-        """Initialize the sensor."""
         super().__init__(coordinator, sn, "Online", "online")
 
     @property
     def is_on(self) -> bool:
-        """Return true if online."""
         return self.coordinator.data.get("online", False)
 
 
@@ -90,30 +93,27 @@ class AirseekersNrtkSensor(AirseekersBaseBinarySensor):
     _attr_icon = "mdi:satellite-variant"
 
     def __init__(self, coordinator: AirseekersDataCoordinator, sn: str) -> None:
-        """Initialize the sensor."""
         super().__init__(coordinator, sn, "RTK Available", "nrtk")
 
     @property
     def is_on(self) -> bool:
-        """Return true if NRTK is available."""
         return self.coordinator.data.get("nrtk_available", False)
 
     @property
     def extra_state_attributes(self):
-        """Return extra attributes."""
         return {
             "nrtk_bound": self.coordinator.data.get("nrtk_bound"),
         }
 
 
 class AirseekersOtaAvailableSensor(AirseekersBaseBinarySensor):
-    """Binary sensor for firmware/MCU OTA availability."""
+    """Binary sensor for MCU OTA availability (from full_status.upgrade_mcu_status)."""
 
     _attr_device_class = BinarySensorDeviceClass.UPDATE
     _attr_entity_registry_enabled_default = False
 
     def __init__(self, coordinator: AirseekersDataCoordinator, sn: str) -> None:
-        super().__init__(coordinator, sn, "OTA Available", "ota_available")
+        super().__init__(coordinator, sn, "MCU Upgrade Available", "ota_available")
 
     @property
     def is_on(self) -> bool:
@@ -137,5 +137,94 @@ class AirseekersChargingSensor(AirseekersBaseBinarySensor):
 
     @property
     def is_on(self) -> bool:
-        state = self.coordinator.data.get("state")
-        return state == "charging"
+        return self.coordinator.data.get("state") == "charging"
+
+
+class AirseekersFirmwareUpgradableSensor(AirseekersBaseBinarySensor):
+    """True if a mower firmware upgrade is available (from /firmware/latest)."""
+
+    _attr_device_class = BinarySensorDeviceClass.UPDATE
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator: AirseekersDataCoordinator, sn: str) -> None:
+        super().__init__(coordinator, sn, "Firmware Upgrade Available", "firmware_upgradable")
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self.coordinator.data.get("firmware_upgradable", False))
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "latest_version": self.coordinator.data.get("firmware_latest_version"),
+            "current_version": self.coordinator.data.get("firmware_current_version"),
+            "force_upgrade": self.coordinator.data.get("firmware_force_upgrade"),
+            "change_log": self.coordinator.data.get("firmware_change_log"),
+        }
+
+
+class AirseekersVoiceUpgradableSensor(AirseekersBaseBinarySensor):
+    """True if a voice-pack upgrade is available (from /voice-version/latest)."""
+
+    _attr_device_class = BinarySensorDeviceClass.UPDATE
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator: AirseekersDataCoordinator, sn: str) -> None:
+        super().__init__(coordinator, sn, "Voice Pack Upgrade Available", "voice_upgradable")
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self.coordinator.data.get("voice_upgradable", False))
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "current_version": self.coordinator.data.get("voice_current_version"),
+            "new_version": self.coordinator.data.get("voice_new_version"),
+            "change_log": self.coordinator.data.get("voice_change_log"),
+        }
+
+
+class AirseekersLegacyTaskSensor(AirseekersBaseBinarySensor):
+    """True if the robot has an interrupted task awaiting resume.
+
+    Surfaces ``full_status.task_status.is_has_legacy_task``. When on, the
+    previous mowing session was interrupted (power loss, manual stop, etc.)
+    and can be resumed or discarded via the app.
+    """
+
+    _attr_icon = "mdi:content-save-alert"
+
+    def __init__(self, coordinator: AirseekersDataCoordinator, sn: str) -> None:
+        super().__init__(coordinator, sn, "Legacy Task Pending", "legacy_task")
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self.coordinator.data.get("has_legacy_task", False))
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "legacy_task_id": self.coordinator.data.get("legacy_task_id") or None,
+            "map_id": self.coordinator.data.get("current_map_id"),
+        }
+
+
+class AirseekersDeviceLockedSensor(AirseekersBaseBinarySensor):
+    """True if the device is currently locked (anti-theft).
+
+    Reads ``lock_status`` from the device list (1 = locked, 2 = unlocked).
+    Using ``BinarySensorDeviceClass.LOCK`` where HA convention is
+    on = unlocked / off = locked.
+    """
+
+    _attr_device_class = BinarySensorDeviceClass.LOCK
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator: AirseekersDataCoordinator, sn: str) -> None:
+        super().__init__(coordinator, sn, "Device Locked", "device_locked")
+
+    @property
+    def is_on(self) -> bool:
+        # HA LOCK convention: is_on => unlocked
+        return self.coordinator.data.get("lock_status") != 1

@@ -10,6 +10,28 @@ Unofficial Home Assistant custom integration for **Airseekers Tron** robotic law
 
 Communicates with the official Airseekers cloud REST API (discovered through reverse engineering of the Airseekers mobile app).
 
+## What's new in v1.0.6
+
+Gap-analysis pass over the live cloud API surface. Ten new entities fill in
+data that the cloud was already returning but we weren't surfacing, plus a
+previously-unused firmware endpoint.
+
+New endpoint wired up: `GET /api/web/firmware/latest` → drives a dedicated
+`Firmware Upgrade Available` binary sensor and `Firmware Latest` diagnostic
+sensor (version, force-upgrade flag, change log as attributes).
+
+New entities from `full_status` data that was already being polled:
+
+| Entity | Source |
+|---|---|
+| `binary_sensor.*_legacy_task_pending` | `task_status.is_has_legacy_task` — shows when a previous mowing session was interrupted and can be resumed |
+| `binary_sensor.*_device_locked` | `lock_status` from the device list (anti-theft state) |
+| `binary_sensor.*_voice_pack_upgrade_available` | `/voice-version/latest.upgradable` |
+| `sensor.*_explore_state` | `explore_mapping_info.state` + boundary/trajectory pose counts during live mapping |
+| `sensor.*_voice_upgrade_progress` / `_state` | `voice_upgrade_status.progress` / `.state` |
+| `sensor.*_wifi_ip` | `net_info.wifi_ip` (complements the existing 4G IP sensor) |
+| `sensor.*_rtk_lora_channel` | `rtk_info.rtk_channel` + address + numeric quality as attributes |
+
 ## Features
 
 ### 🤖 Lawn Mower Entity
@@ -162,7 +184,11 @@ Many entities are **disabled by default** to reduce dashboard clutter. Enable th
 | `binary_sensor.*_online` | Robot online |
 | `binary_sensor.*_rtk_available` | RTK positioning available |
 | `binary_sensor.*_charging` | On dock charging |
-| `binary_sensor.*_ota_available` | Firmware upgrade pending (disabled by default) |
+| `binary_sensor.*_mcu_upgrade_available` | MCU firmware pending (disabled by default) |
+| `binary_sensor.*_firmware_upgrade_available` | Mower firmware pending from cloud (disabled by default) |
+| `binary_sensor.*_voice_pack_upgrade_available` | Voice pack update pending (disabled by default) |
+| `binary_sensor.*_legacy_task_pending` | Previous mowing session interrupted and resumable |
+| `binary_sensor.*_device_locked` | Anti-theft lock state (disabled by default) |
 
 ### Switches
 | Entity | Description |

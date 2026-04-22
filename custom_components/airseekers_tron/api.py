@@ -21,8 +21,16 @@ from .const import (
     API_NOTIFY_LIST,
     API_FIRMWARE,
     API_RTK_INFO,
+    API_TASK_RECORD,
+    API_WARRANTY,
+    API_EXTENDED_WARRANTY,
+    API_NRTK_SUPPORTED,
+    API_VOICE_VERSION,
+    API_TASK_LATEST,
     STATE_IDLE,
     STATE_MOWING,
+    STATE_PAUSED,
+    STATE_DOCKING,
     STATE_CHARGING,
     STATE_OFFLINE,
 )
@@ -270,6 +278,55 @@ class AirseekersApi:
         """
         data = await self._get("/api/web/device/full-status", params={"sn": sn})
         if data.get("code") != 0:
+            return {}
+        return data.get("data", {}) or {}
+
+    async def get_warranty(self, sn: str) -> Dict[str, Any]:
+        """Get device warranty info (start/end epoch). Returns {} on error."""
+        data = await self._get(API_WARRANTY, params={"sn": sn})
+        if data.get("code") != 0:
+            return {}
+        return data.get("data", {}) or {}
+
+    async def get_extended_warranty(self, sn: str) -> Dict[str, Any]:
+        """Get extended warranty info. Returns {} if not purchased (code 701)."""
+        data = await self._get(API_EXTENDED_WARRANTY, params={"sn": sn})
+        if data.get("code") != 0:
+            return {}
+        return data.get("data", {}) or {}
+
+    async def get_nrtk_supported(self, sn: str) -> Dict[str, Any]:
+        """Check if NRTK is available at the device's location."""
+        data = await self._get(API_NRTK_SUPPORTED, params={"sn": sn})
+        if data.get("code") != 0:
+            return {}
+        return data.get("data", {}) or {}
+
+    async def get_voice_version(self, sn: str) -> Dict[str, Any]:
+        """Get voice pack version info (current, latest, upgradable)."""
+        data = await self._get(API_VOICE_VERSION, params={"sn": sn})
+        if data.get("code") != 0:
+            return {}
+        return data.get("data", {}) or {}
+
+    async def get_task_record_latest(self, sn: str) -> Dict[str, Any]:
+        """Get the most recent completed task record (with pictures/duration/area)."""
+        data = await self._get(API_TASK_RECORD, params={"sn": sn})
+        if data.get("code") != 0:
+            return {}
+        return data.get("data", {}) or {}
+
+    async def get_firmware_latest(self, sn: str) -> Dict[str, Any]:
+        """Get latest firmware metadata.
+
+        Returns a dict with at least ``version``, ``current_version`` and
+        ``upgradable``. The API replies with code 407 ("Already the latest
+        version") when there is no upgrade — we still return ``data`` in that
+        case so the caller can surface the current/target version.
+        """
+        data = await self._get(API_FIRMWARE, params={"sn": sn})
+        # code 407 is "already latest" — the payload is still useful.
+        if data.get("code") not in (0, 407):
             return {}
         return data.get("data", {}) or {}
 

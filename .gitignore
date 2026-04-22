@@ -73,3 +73,6 @@ venv.bak/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Stray empty file from a shell glob mishap (user cannot rm it from WSL)
+/git

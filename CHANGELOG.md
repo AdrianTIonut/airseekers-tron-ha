@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2026-04-23
+
+### Added
+- `GET /api/web/firmware/latest` is now polled; surfaces as
+  `binary_sensor.*_firmware_upgrade_available` and
+  `sensor.*_firmware_latest` (with `current_version`, `force_upgrade`,
+  `change_log` as attributes).
+- `binary_sensor.*_voice_pack_upgrade_available` — complements the
+  existing `sensor.*_voice_pack_latest` with a device-class update sensor.
+- `binary_sensor.*_legacy_task_pending` — surfaces
+  `task_status.is_has_legacy_task`; fires when a previous mowing session
+  was interrupted and can be resumed from the app.
+- `binary_sensor.*_device_locked` — anti-theft lock state from
+  `lock_status` (separate from the `DeviceLock` config switch).
+- `sensor.*_explore_state` — mapping-session state, with boundary and
+  trajectory pose counts as attributes.
+- `sensor.*_voice_upgrade_progress` / `sensor.*_voice_upgrade_state` —
+  parity with the MCU upgrade sensors that already existed.
+- `sensor.*_wifi_ip` — WiFi-side IP address (was previously missing;
+  only the 4G IP was exposed).
+- `sensor.*_rtk_lora_channel` — currently-negotiated LoRa channel on the
+  RTK radio, with address and numeric quality as attributes.
+- `AirseekersApi.get_firmware_latest(sn)` helper; accepts both code 0
+  and code 407 (already-latest) as success.
+
+### Changed
+- Renamed `binary_sensor.*_ota_available` label to "MCU Upgrade
+  Available" (unique_id unchanged) to distinguish it from the new
+  mower-firmware upgrade sensor.
+- Coordinator fetches warranty, extended warranty, NRTK availability,
+  voice version, last task record, and latest firmware in a single
+  `asyncio.gather`.
+
+### Fixed
+- Restored `api.py` and `coordinator.py` after a truncation mishap
+  during the v1.0.5 → v1.0.6 refactor.
+
 ## [1.0.5] - 2026-04-20
 
 ### Added
