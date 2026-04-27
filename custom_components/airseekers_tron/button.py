@@ -86,18 +86,37 @@ class AirseekersStartButton(AirseekersBaseButton):
         super().__init__(coordinator, api, sn, "Start Mowing", "start", "mdi:play")
 
     async def async_press(self) -> None:
-        """Handle the button press."""
+        """Handle the button press.
+
+        Same fallback logic as lawn_mower.async_start_mowing — try saved
+        scheduled tasks first, then fall back to the latest executed task
+        so the user does not need a placeholder schedule in the app.
+        """
+        task = None
         tasks = self.coordinator.data.get("tasks", [])
-        if not tasks:
-            _LOGGER.error(
-                "No scheduled tasks found - cannot start mowing. "
-                "Create a task in the Airseekers mobile app first."
-            )
-            return
-        task = tasks[0]
+        if tasks:
+            task = tasks[0]
+        else:
+            latest = await self._api.get_latest_task(self._sn)
+            if latest and latest.get("task_units"):
+                task = latest
+                _LOGGER.info(
+                    "Start button: no scheduled tasks; reusing latest "
+                    "task %s (map %s)",
+                    latest.get("id") or latest.get("task_id"),
+                    latest.get("map_id"),
+                )
+            else:
+                _LOGGER.error(
+                    "Start button: no scheduled tasks and no recent task "
+                    "on the device. Run the mower once from the Airseekers "
+                    "app first."
+                )
+                return
+
         await self._api.start_task(
             self._sn,
-            task_id=task.get("id"),
+            task_id=task.get("id") or task.get("task_id"),
             map_id=task.get("map_id"),
             mode=task.get("mode", 1),
             task_units=task.get("task_units"),

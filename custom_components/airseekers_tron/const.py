@@ -175,6 +175,48 @@ NOTIFY_TYPE_LABELS = {
     1200001: "Blade wear warning",
 }
 
+# Task-level enums (from observed API payloads)
+TASK_MODE_LABELS = {
+    0: "global",     # Global Mowing
+    1: "ai",         # AI Mowing
+    2: "edge",       # Edge Mowing
+    3: "area",       # Area Mowing
+}
+TASK_MODE_LOOKUP = {v: k for k, v in TASK_MODE_LABELS.items()}
+
+# Per-zone (task_unit) enums
+CUT_SPEED_LABELS = {
+    1: "slow",
+    2: "normal",
+    3: "fast",
+}
+CUT_SPEED_LOOKUP = {v: k for k, v in CUT_SPEED_LABELS.items()}
+
+# "Mowing efficiency" in the app — affects how dense the cutting passes are
+STRATEGY_LABELS = {
+    1: "stability",
+    2: "dense",
+    3: "spare",
+}
+STRATEGY_LOOKUP = {v: k for k, v in STRATEGY_LABELS.items()}
+
+# "Turning method" in the app  (note: API spells it "truning_mode" — typo!)
+TURNING_MODE_LABELS = {
+    1: "fishtail",       # Inner fishtail
+    2: "circular",       # Circular turning
+    3: "turn_in_place",  # Turn in place
+}
+TURNING_MODE_LOOKUP = {v: k for k, v in TURNING_MODE_LABELS.items()}
+
+# Map feature `kind` field
+MAP_FEATURE_KIND_MOWABLE_POLYGON = 1   # cuttable zone (Polygon with name A/B/...)
+MAP_FEATURE_KIND_BORDER = 3            # boundary line of a zone
+MAP_FEATURE_KIND_NOGO_A = 4            # no-go zone variant A
+MAP_FEATURE_KIND_NOGO_B = 5            # no-go zone variant B
+MAP_FEATURE_KIND_CHARGE_POINT = 6      # dock charge point
+MAP_FEATURE_KIND_UNDOCK_POINT = 7      # undock point
+MAP_FEATURE_KIND_RTK_BASE = 8          # RTK base location
+
 SENSOR_STATUS_BITS = {
     0: "bump_front",
     1: "bump_rear",

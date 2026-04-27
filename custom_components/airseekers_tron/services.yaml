@@ -1,0 +1,80 @@
+start_mowing_advanced:
+  name: Start mowing (advanced)
+  description: >-
+    Start a custom mowing task with chosen zones and cut settings. Anything
+    not specified falls back to the values from the user's first scheduled
+    (placeholder) task in the Airseekers app.
+  fields:
+    sn:
+      name: Serial number
+      description: Optional. Limits the command to a single robot if you have multiple.
+      example: "100100000000XXXX"
+      selector:
+        text:
+    zones:
+      name: Zones
+      description: >-
+        List of zone names to mow (case-sensitive — e.g. ["A","B"]). Omit
+        to mow all zones from the placeholder task.
+      example: ["A"]
+      selector:
+        object:
+    mode:
+      name: Mowing mode
+      description: Task-level mowing mode.
+      example: global
+      selector:
+        select:
+          options:
+            - global
+            - ai
+            - edge
+            - area
+    cut_height:
+      name: Cut height (mm)
+      description: Cutter height in mm (range 20-120).
+      example: 40
+      selector:
+        number:
+          min: 20
+          max: 120
+          unit_of_measurement: mm
+    cut_direction:
+      name: Cut direction (degrees)
+      description: Cutting direction 0-359° (converted to radians for the API).
+      example: 90
+      selector:
+        number:
+          min: 0
+          max: 359
+          unit_of_measurement: "°"
+    cut_speed:
+      name: Cut speed
+      description: Per-zone cut speed.
+      example: normal
+      selector:
+        select:
+          options:
+            - slow
+            - normal
+            - fast
+    strategy:
+      name: Mowing efficiency
+      description: How dense the cutting passes are.
+      example: dense
+      selector:
+        select:
+          options:
+            - stability
+            - dense
+            - spare
+    turning_mode:
+      name: Turning method
+      description: How the robot turns at the end of each pass.
+      example: turn_in_place
+      selector:
+        select:
+          options:
+            - fishtail
+            - circular
+            - turn_in_place

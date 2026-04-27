@@ -10,6 +10,64 @@ Unofficial Home Assistant custom integration for **Airseekers Tron** robotic law
 
 Communicates with the official Airseekers cloud REST API (discovered through reverse engineering of the Airseekers mobile app).
 
+## What's new in v1.0.7
+
+A new service for advanced control and a smarter `start_mowing` fallback.
+
+### 🛠️ New service: `airseekers_tron.start_mowing_advanced`
+
+Fire a custom mowing job straight from HA, with the same per-zone
+control the app gives you:
+
+```yaml
+service: airseekers_tron.start_mowing_advanced
+data:
+  zones: ["A"]            # which polygon zones to mow (skip the rest)
+  mode: area              # global / ai / edge / area
+  cut_height: 50          # mm
+  cut_direction: 90       # degrees (the API stores this in radians)
+  cut_speed: fast         # slow / normal / fast
+  strategy: dense         # stability / dense / spare  (≈ "Mowing efficiency")
+  turning_mode: turn_in_place  # fishtail / circular / turn_in_place
+```
+
+Anything you omit is inherited from the first scheduled task you have
+in the app, so existing per-zone tuning (cut height, sequence, ...) is
+preserved.
+
+### 🔊 Volume + light brightness fixes
+
+- Volume scale fixed from **0-10 → 0-100**. Earlier versions clamped
+  to 0-10, which mapped to ~7% volume at the device level (basically
+  inaudible). Verified against live cloud state diff: the official app
+  sends 0-100 to `/api/web/device/config` under `SetVolume`.
+- Light brightness range expanded to **0-100 step 1** (was 10-100 step
+  10), matching the granularity the app supports. `0` turns the
+  fill-light off.
+- `set_light_brightness` now also updates `/api/web/device/config`
+  alongside the real-time `fill-light-setting` push, so the cloud
+  stays in sync.
+
+### 🔁 Smarter `start_mowing`
+
+`lawn_mower.start_mowing` and `button.airseekers_tron_start_mowing` now
+fall back to the most recent executed task when no scheduled task
+exists on the account (via `GET /api/web/device/task/latest`). You no
+longer need a placeholder schedule in the mobile app — the integration
+will replay whatever the user last started by hand.
+
+### 🔎 Reverse-engineered fields (worth knowing)
+
+- `cut_mode` inside `task_units` is the per-zone **"Mowing / No mowing"**
+  toggle. `1` = mow this zone, `0` = skip it.
+- `path_angle` is in **radians**.
+- API field has a typo: `truning_mode` (not `turning_mode`).
+- `properties.type` integer on map features: `1` = mowable polygon,
+  `3` = boundary, `4`/`5` = no-go zones, `6`/`7` = charge / undock
+  points, `8` = RTK base.
+
+---
+
 ## What's new in v1.0.6
 
 Gap-analysis pass over the live cloud API surface. Ten new entities fill in

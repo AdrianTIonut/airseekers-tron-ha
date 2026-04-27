@@ -76,3 +76,10 @@ Desktop.ini
 
 # Stray empty file from a shell glob mishap (user cannot rm it from WSL)
 /git
+
+# Local backups (kept outside custom_components/)
+_backups/
+_local_backups/
+
+# Diagnostic dumps (from airseekers_tron.dump_diagnostics service)
+airseekers_diagnostics*.json

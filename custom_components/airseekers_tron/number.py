@@ -85,7 +85,11 @@ class AirseekersBaseNumber(CoordinatorEntity, NumberEntity):
 
 
 class AirseekersVolume(AirseekersBaseNumber):
-    """Number entity for robot volume (0-10)."""
+    """Number entity for robot volume (0-100, %).
+
+    The cloud's SetVolume field is on a 0-100 scale (verified via live
+    state diff while dragging the volume slider in the official app).
+    """
 
     def __init__(self, coordinator, api, sn: str) -> None:
         """Initialize the entity."""
@@ -95,14 +99,15 @@ class AirseekersVolume(AirseekersBaseNumber):
             key="volume",
             icon="mdi:volume-high",
             min_value=0,
-            max_value=10,
+            max_value=100,
             step=1,
+            unit="%",
         )
 
     @property
     def native_value(self) -> float:
         """Return the current value."""
-        return self.coordinator.data.get("volume", 5)
+        return self.coordinator.data.get("volume", 50)
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the value."""
@@ -111,7 +116,11 @@ class AirseekersVolume(AirseekersBaseNumber):
 
 
 class AirseekersLightBrightness(AirseekersBaseNumber):
-    """Number entity for robot light brightness (10-100)."""
+    """Number entity for robot light brightness (0-100 %).
+
+    Granularity is per-1 (verified by observing slider drag in the
+    official app — values like 18, 48, 52, 66 are all valid).
+    """
 
     def __init__(self, coordinator, api, sn: str) -> None:
         """Initialize the entity."""
@@ -120,10 +129,10 @@ class AirseekersLightBrightness(AirseekersBaseNumber):
             name="Light Brightness",
             key="light_brightness",
             icon="mdi:brightness-6",
-            min_value=10,
+            min_value=0,
             max_value=100,
-            step=10,
-            unit="%"
+            step=1,
+            unit="%",
         )
 
     @property

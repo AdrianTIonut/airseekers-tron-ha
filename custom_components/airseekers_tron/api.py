@@ -195,8 +195,20 @@ class AirseekersApi:
         return data.get("data", {}).get("configs", {})
 
     async def set_config(self, sn: str, key: str, value: str) -> bool:
-        """Set a configuration value."""
-        data = await self._post(API_CONFIG, {"sn": sn, key: value})
+        """Set a configuration value.
+
+        The cloud accepts a flat ``{"sn": ..., "key": value}`` body and
+        responds with ``code: 0`` (success), but **silently drops** the
+        write — the field never persists. The only body shape that
+        actually saves is the wrapped form below, verified by writing a
+        unique value and reading it back through ``GET /config``::
+
+            {"sn": "...", "configs": {"<Key>": "<value>"}}
+
+        See ``probe_config_format.py`` in the repo for the test harness
+        that uncovered this.
+        """
+        data = await self._post(API_CONFIG, {"sn": sn, "configs": {key: value}})
         if data.get("code") == 0:
             _LOGGER.info("Config %s=%s set successfully for %s", key, value, sn)
             return True
@@ -204,12 +216,28 @@ class AirseekersApi:
         return False
 
     async def set_volume(self, sn: str, volume: int) -> bool:
-        """Set robot volume (0-10)."""
-        return await self.set_config(sn, "SetVolume", str(max(0, min(10, volume))))
+        """Set robot volume (0-100).
+
+        Discovered via live cloud-state diff: the app's volume slider sends
+        values 0..100 to /api/web/device/config under the `SetVolume` key
+        (stored as a string). Earlier integration versions clamped to 0-10
+        by mistake — that maps to 7 = 7% which is barely audible.
+        """
+        return await self.set_config(sn, "SetVolume", str(max(0, min(100, int(volume)))))
 
     async def set_light_brightness(self, sn: str, brightness: int) -> bool:
-        """Set light brightness (10-100). Uses fill-light-setting endpoint."""
-        brightness = max(10, min(100, int(brightness)))
+        """Set light brightness (0-100).
+
+        The app fires two requests when the slider moves: one to
+        `/api/web/device/config` (SetLightBrightness, cloud-side state)
+        and one to `/api/web/device/fill-light-setting` (real-time push
+        to the robot). We do both so the cloud value stays in sync with
+        what the device actually does.
+        """
+        brightness = max(0, min(100, int(brightness)))
+        # Cloud-side config (what the app shows on next open)
+        await self.set_config(sn, "SetLightBrightness", str(brightness))
+        # Real-time push to the device
         return await self.set_fill_light(sn, brightness, enabled=brightness > 0)
 
     async def set_night_mode(self, sn: str, start_time: str, end_time: str) -> bool:
@@ -228,6 +256,19 @@ class AirseekersApi:
         if data.get("code") != 0:
             return []
         return data.get("data", {}).get("list", [])
+
+    async def get_latest_task(self, sn: str) -> Dict[str, Any]:
+        """Get the most recent task definition (used by app's Quick Mow).
+
+        Returns the last task that was executed with its full definition:
+        task_id, map_id, mode, task_units. We use this as a fallback when no
+        scheduled tasks exist, so HA can replay the user's last manual start
+        without requiring a placeholder schedule in the app.
+        """
+        data = await self._get(API_TASK_LATEST, params={"sn": sn})
+        if data.get("code") != 0:
+            return {}
+        return data.get("data", {}) or {}
 
     async def get_task_history(
         self, sn: str, page: int = 1, size: int = 10

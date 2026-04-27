@@ -92,15 +92,44 @@ class AirseekersLawnMower(CoordinatorEntity, LawnMowerEntity):
         return self.coordinator.data.get("online", False)
 
     async def async_start_mowing(self) -> None:
-        """Start mowing."""
+        """Start mowing.
+
+        Resolution order for the task definition the cloud API requires:
+        1. First scheduled task saved in the app (if any).
+        2. Fallback: the most recent task the device executed
+           (/api/web/device/task/latest). This lets HA reuse what the user
+           last started from the app's Quick Mow / Start, so no placeholder
+           schedule is required in the Airseekers app.
+        """
+        task = None
         tasks = self.coordinator.data.get("tasks", [])
-        if not tasks:
-            _LOGGER.error("No scheduled tasks found - cannot start mowing. Create a task in the Airseekers mobile app first.")
-            return
-        task = tasks[0]  # Use first task
+        if tasks:
+            task = tasks[0]
+            _LOGGER.debug(
+                "start_mowing: using scheduled task %s", task.get("id")
+            )
+        else:
+            latest = await self._api.get_latest_task(self._sn)
+            if latest and latest.get("task_units"):
+                task = latest
+                _LOGGER.info(
+                    "start_mowing: no scheduled tasks; reusing latest "
+                    "task %s (map %s, mode %s)",
+                    latest.get("id") or latest.get("task_id"),
+                    latest.get("map_id"),
+                    latest.get("mode"),
+                )
+            else:
+                _LOGGER.error(
+                    "start_mowing: no scheduled tasks and no recent task "
+                    "on the device. Run the mower at least once from the "
+                    "Airseekers app, then try again."
+                )
+                return
+
         await self._api.start_task(
             self._sn,
-            task_id=task.get("id"),
+            task_id=task.get("id") or task.get("task_id"),
             map_id=task.get("map_id"),
             mode=task.get("mode", 1),
             task_units=task.get("task_units"),

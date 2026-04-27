@@ -91,15 +91,27 @@ class AirseekersNightModeSwitch(AirseekersBaseSwitch):
         return self.coordinator.data.get("night_mode_enabled", False)
 
     async def async_turn_on(self, **kwargs) -> None:
-        """Turn on night mode."""
-        _LOGGER.info(f"Enabling night mode for {self._sn}")
-        # TODO: Implement when endpoint is discovered
+        """Turn on night mode.
+
+        Night mode is governed by SetDarkMode = "HH:MM-HH:MM". An empty
+        value disables it, a range enables it. We restore whatever the
+        user last had (if known), otherwise apply a sensible default.
+        """
+        previous = self.coordinator.data.get("night_mode_raw") or ""
+        # If we have a previous schedule remembered, reuse it. Otherwise
+        # fall back to start/end values stored in coordinator data, then
+        # to a sensible default of 22:00-06:00.
+        start = self.coordinator.data.get("night_mode_start") or "22:00"
+        end = self.coordinator.data.get("night_mode_end") or "06:00"
+        schedule = previous if previous else f"{start}-{end}"
+        _LOGGER.info("Enabling night mode (%s) for %s", schedule, self._sn)
+        await self._api.set_config(self._sn, "SetDarkMode", schedule)
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs) -> None:
-        """Turn off night mode."""
-        _LOGGER.info(f"Disabling night mode for {self._sn}")
-        # TODO: Implement when endpoint is discovered
+        """Turn off night mode by clearing SetDarkMode."""
+        _LOGGER.info("Disabling night mode for %s", self._sn)
+        await self._api.set_config(self._sn, "SetDarkMode", "")
         await self.coordinator.async_request_refresh()
 
 

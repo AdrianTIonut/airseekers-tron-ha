@@ -1,0 +1,57 @@
+name: Auto Release on Tag
+
+# Creates a GitHub Release every time a tag matching `v*` is pushed.
+# The release notes are populated from the matching section in CHANGELOG.md
+# (e.g. tag v1.0.7 → the "## [1.0.7] - YYYY-MM-DD" section).
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: ver
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG_NAME#v}"
+          echo "tag=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          # Pull everything between the matching "## [VERSION]" header and
+          # the next "## [" header. Strip the trailing "---" separator.
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release_notes.md
+          # If extraction is empty, fall back to a minimal note
+          if [ ! -s release_notes.md ]; then
+            echo "Release ${VERSION}. See CHANGELOG.md for details." > release_notes.md
+          fi
+          # Trim trailing "---" separator line
+          sed -i -E '/^---[[:space:]]*$/,$d' release_notes.md
+          echo "==== Notes ===="
+          cat release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false

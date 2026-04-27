@@ -86,11 +86,19 @@ class AirseekersDataCoordinator(DataUpdateCoordinator):
             # Determine state - uses full_status as primary, notifications as fallback
             state = self.api.determine_state(device, notifications, full_status)
 
-            # Night mode parsing
-            night_mode_raw = config.get("SetDarkMode", "22:00-06:00")
-            night_mode_parts = night_mode_raw.split("-")
-            night_mode_start = night_mode_parts[0] if len(night_mode_parts) == 2 else "22:00"
-            night_mode_end = night_mode_parts[1] if len(night_mode_parts) == 2 else "06:00"
+            # Night mode parsing — empty SetDarkMode means OFF (verified
+            # by toggling Night Mode in the official app and watching the
+            # cloud `SetDarkMode` go from "22:00-06:55" to "").
+            night_mode_raw = (config.get("SetDarkMode") or "").strip()
+            night_mode_enabled = bool(night_mode_raw)
+            if night_mode_enabled and "-" in night_mode_raw:
+                parts = night_mode_raw.split("-", 1)
+                night_mode_start = parts[0] or "22:00"
+                night_mode_end = parts[1] or "06:00"
+            else:
+                # Defaults shown in HA when night mode is off
+                night_mode_start = "22:00"
+                night_mode_end = "06:00"
 
             # Helpers to safely extract nested data from full_status
             battery = full_status.get("battery_status") or {}
@@ -127,9 +135,10 @@ class AirseekersDataCoordinator(DataUpdateCoordinator):
                 "iccid": device.get("iccid"),
                 "func_list": device.get("func_list", []),
                 # Config (stored server-side)
-                "volume": int(config.get("SetVolume", "5") or "5"),
+                "volume": int(config.get("SetVolume", "50") or "50"),
                 "light_brightness": int(config.get("SetLightBrightness", "0") or "0"),
-                "night_mode_enabled": True,
+                "night_mode_enabled": night_mode_enabled,
+                "night_mode_raw": night_mode_raw,
                 "night_mode_start": night_mode_start,
                 "night_mode_end": night_mode_end,
                 "device_lock": config.get("DeviceLock", "0") == "1",
