@@ -95,12 +95,37 @@ class AirseekersLawnMower(CoordinatorEntity, LawnMowerEntity):
         """Start mowing.
 
         Resolution order for the task definition the cloud API requires:
-        1. First scheduled task saved in the app (if any).
-        2. Fallback: the most recent task the device executed
-           (/api/web/device/task/latest). This lets HA reuse what the user
-           last started from the app's Quick Mow / Start, so no placeholder
-           schedule is required in the Airseekers app.
+        1. **Legacy task pending** — if Tron came back to dock with a
+           half-done task (``is_has_legacy_task=true``), continue exactly
+           that task using its ``legacy_task_id``. The plain
+           ``/task/resume`` endpoint silently no-ops for legacy tasks.
+        2. First scheduled task saved in the app.
+        3. Fallback: the most recent task the device executed
+           (``/api/web/device/task/latest``). This lets HA reuse what the
+           user last started from the app's Quick Mow / Start, so no
+           placeholder schedule is required in the Airseekers app.
         """
+        data = self.coordinator.data or {}
+        has_legacy = bool(data.get("has_legacy_task"))
+        legacy_id = data.get("legacy_task_id") or ""
+
+        if has_legacy and legacy_id:
+            tasks = data.get("tasks") or []
+            base = tasks[0] if tasks else {}
+            _LOGGER.info(
+                "start_mowing: continuing legacy task %s (after dock cycle)",
+                legacy_id,
+            )
+            await self._api.start_task(
+                self._sn,
+                task_id=legacy_id,
+                map_id=data.get("current_map_id") or base.get("map_id"),
+                mode=base.get("mode", 1),
+                task_units=base.get("task_units"),
+            )
+            await self.coordinator.async_request_refresh()
+            return
+
         task = None
         tasks = self.coordinator.data.get("tasks", [])
         if tasks:

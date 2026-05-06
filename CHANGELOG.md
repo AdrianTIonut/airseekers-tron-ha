@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8] - 2026-05-01
+
+### Fixed
+- **Resume after dock-charge cycle** — `button.airseekers_tron_resume`,
+  `button.airseekers_tron_start_mowing`, and `lawn_mower.start_mowing`
+  now detect "legacy task pending" state (when Tron returned to dock
+  mid-task to charge) and call `/api/web/device/task/start` with the
+  legacy `task_id` instead of `/api/web/device/task/resume`, which is a
+  silent no-op for legacy tasks. Tron correctly continues exactly where
+  it left off after a charge cycle.
+
+### Documentation
+- Added "Persistent settings via input_helpers" section in README,
+  showing the recommended pattern for persisting `cut_height`,
+  `cut_speed`, `strategy`, `turning_mode` between mowing runs without
+  hard-coding them in automation YAML.
+- Added bonus snippet for rotating `cut_direction` over a 4-week cycle
+  to prevent grass-rut formation.
+
+---
+
 ## [1.0.7] - 2026-04-27
 
 ### Added

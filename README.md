@@ -10,6 +10,87 @@ Unofficial Home Assistant custom integration for **Airseekers Tron** robotic law
 
 Communicates with the official Airseekers cloud REST API (discovered through reverse engineering of the Airseekers mobile app).
 
+## What's new in v1.0.8
+
+- **Smart Resume after dock-charge cycle** — `Resume` button and
+  `lawn_mower.start_mowing` now detect "legacy task pending" state
+  (when Tron returned to dock mid-task to charge) and call
+  `/task/start` with the legacy `task_id` instead of the no-op
+  `/task/resume`. Tron correctly continues exactly where it left off
+  after charging.
+- **Helper-driven defaults pattern** documented (see below) — set cut
+  height, speed, strategy, turning method via persistent HA helpers
+  consumed by `start_mowing_advanced`.
+
+## Persistent settings via input_helpers (recommended pattern)
+
+Each call to `airseekers_tron.start_mowing_advanced` accepts cut height
+/ speed / strategy / turning method as parameters. To make these
+**persistent** (survive reboots, easy to change from UI), create five
+HA helpers and read them in your automations.
+
+### Step 1 — Create the helpers
+
+Settings → Devices & Services → **Helpers** → **+ Create Helper**:
+
+| Type | Suggested name | Settings |
+|---|---|---|
+| Number | `Tron Cut Height Default` | min 30, max 90, step 10, unit `mm`, initial 50 |
+| Number | `Tron Cut Direction Default` | min -90, max 90, step 10, unit `°`, initial 0 |
+| Dropdown | `Tron Cut Speed Default` | options: `slow`, `normal`, `fast` |
+| Dropdown | `Tron Strategy Default` | options: `stability`, `dense`, `spare` |
+| Dropdown | `Tron Turning Default` | options: `fishtail`, `circular`, `turn_in_place` |
+
+> **Range note**: Tron's app uses `30-90 mm step 10` for height and
+> `-90° to +90° step 10` for direction (180° rotation produces the
+> same line, so signed half-circle is enough).
+
+That gives you:
+- `input_number.tron_cut_height_default`
+- `input_number.tron_cut_direction_default`
+- `input_select.tron_cut_speed_default`
+- `input_select.tron_strategy_default`
+- `input_select.tron_turning_default`
+
+### Step 2 — Use them in your automation
+
+```yaml
+service: airseekers_tron.start_mowing_advanced
+data:
+  mode: global
+  cut_height: "{{ states('input_number.tron_cut_height_default') | int }}"
+  cut_direction: "{{ states('input_number.tron_cut_direction_default') | int }}"
+  cut_speed: "{{ states('input_select.tron_cut_speed_default') }}"
+  strategy: "{{ states('input_select.tron_strategy_default') }}"
+  turning_mode: "{{ states('input_select.tron_turning_default') }}"
+```
+
+You can also drop the helpers on a Lovelace dashboard so you can change
+them with one tap before your scheduled mow.
+
+### Bonus — rotating angle to avoid grass ruts
+
+Instead of a static helper for `cut_direction`, compute it from the
+ISO week number so each cut comes from a different angle. This avoids
+visible "lines" in the lawn over time. Tron's range is `-90..+90`
+(since 180° rotation = same direction), so we map the result.
+
+```yaml
+cut_direction: >-
+  {%- set base = ((now().isocalendar()[1] | int - 1) % 4) * 45 -%}
+  {%- if now().weekday() == 4 -%}
+    {%- set a = (base + 90) % 180 -%}
+  {%- else -%}
+    {%- set a = base % 180 -%}
+  {%- endif -%}
+  {{ a if a <= 90 else a - 180 }}
+```
+
+This rotates through 0°, 45°, 90°, -45° over a 4-week cycle (each
+value picks one of the four cutting orientations).
+
+---
+
 ## What's new in v1.0.7
 
 A new service for advanced control and a smarter `start_mowing` fallback.

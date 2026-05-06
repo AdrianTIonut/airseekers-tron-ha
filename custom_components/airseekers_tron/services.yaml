@@ -32,22 +32,24 @@ start_mowing_advanced:
             - area
     cut_height:
       name: Cut height (mm)
-      description: Cutter height in mm (range 20-120).
-      example: 40
+      description: "Cutter height in mm. Tron app range 30-90 mm step 10. Out-of-range values are accepted by the API but may not be applied by the device."
+      example: 50
       selector:
         number:
-          min: 20
-          max: 120
+          min: 30
+          max: 90
+          step: 10
           unit_of_measurement: mm
     cut_direction:
       name: Cut direction (degrees)
-      description: Cutting direction 0-359° (converted to radians for the API).
-      example: 90
+      description: "Cutting direction. Tron app range -90 to 90, step 10 (180 rotation = same line). Converted to radians for the API."
+      example: 45
       selector:
         number:
-          min: 0
-          max: 359
-          unit_of_measurement: "°"
+          min: -90
+          max: 90
+          step: 10
+          unit_of_measurement: deg
     cut_speed:
       name: Cut speed
       description: Per-zone cut speed.

@@ -28,6 +28,7 @@ async def async_setup_entry(
         entities.extend([
             AirseekersVolume(coordinator, api, sn),
             AirseekersLightBrightness(coordinator, api, sn),
+            AirseekersCutHeight(coordinator, api, sn),
         ])
 
     async_add_entities(entities)
@@ -144,3 +145,53 @@ class AirseekersLightBrightness(AirseekersBaseNumber):
         """Set the value."""
         await self._api.set_light_brightness(self._sn, int(value))
         await self.coordinator.async_request_refresh()
+
+
+class AirseekersCutHeight(AirseekersBaseNumber):
+    """Number entity for mowing cut height (20–120 mm, step 5 mm).
+
+    Reads the current value from the first scheduled task's first
+    task_unit (``cutter_height``).  When the user changes it, the full
+    task is PUT back to the cloud via ``update_task_cut_height`` so the
+    new height is saved and will be used on the next mow start.
+
+    The entity is also read by ``start_mowing_advanced`` as the default
+    height when the caller does not provide ``cut_height`` explicitly.
+    """
+
+    def __init__(self, coordinator, api, sn: str) -> None:
+        """Initialize the entity."""
+        super().__init__(
+            coordinator, api, sn,
+            name="Cut Height",
+            key="cut_height",
+            icon="mdi:grass",
+            min_value=20,
+            max_value=120,
+            step=5,
+            unit="mm",
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        """Return cutter_height from the first scheduled task_unit."""
+        tasks = (self.coordinator.data or {}).get("tasks") or []
+        if not tasks:
+            return None
+        units = tasks[0].get("task_units") or []
+        if not units:
+            return None
+        return units[0].get("cutter_height", 50)
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Persist the new cut height to all task_units in the scheduled task."""
+        tasks = (self.coordinator.data or {}).get("tasks") or []
+        if not tasks:
+            _LOGGER.error(
+                "CutHeight: no scheduled task found — cannot persist height %s mm",
+                int(value),
+            )
+            return
+        ok = await self._api.update_task_cut_height(self._sn, tasks[0], int(value))
+        if ok:
+            await self.coordinator.async_request_refresh()

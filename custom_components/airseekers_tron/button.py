@@ -88,10 +88,33 @@ class AirseekersStartButton(AirseekersBaseButton):
     async def async_press(self) -> None:
         """Handle the button press.
 
-        Same fallback logic as lawn_mower.async_start_mowing — try saved
-        scheduled tasks first, then fall back to the latest executed task
-        so the user does not need a placeholder schedule in the app.
+        Resolution order:
+        1. **Legacy task pending** — pick up exactly where Tron left off
+           after a dock cycle (uses ``legacy_task_id``).
+        2. First scheduled task in the app.
+        3. Fallback to the latest executed task (so users don't need a
+           placeholder schedule in the app).
         """
+        data = self.coordinator.data or {}
+        has_legacy = bool(data.get("has_legacy_task"))
+        legacy_id = data.get("legacy_task_id") or ""
+
+        if has_legacy and legacy_id:
+            tasks = data.get("tasks") or []
+            base = tasks[0] if tasks else {}
+            _LOGGER.info(
+                "Start button: continuing legacy task %s", legacy_id,
+            )
+            await self._api.start_task(
+                self._sn,
+                task_id=legacy_id,
+                map_id=data.get("current_map_id") or base.get("map_id"),
+                mode=base.get("mode", 1),
+                task_units=base.get("task_units"),
+            )
+            await self.coordinator.async_request_refresh()
+            return
+
         task = None
         tasks = self.coordinator.data.get("tasks", [])
         if tasks:
@@ -151,7 +174,20 @@ class AirseekersPauseButton(AirseekersBaseButton):
 
 
 class AirseekersResumeButton(AirseekersBaseButton):
-    """Button to resume mowing."""
+    """Button to resume mowing.
+
+    Smart-resume that handles both cases:
+
+    1. **Currently paused** (state=paused) — calls ``/task/resume`` which
+       resumes the in-session paused task.
+    2. **Legacy task pending** (e.g. Tron returned to dock for charging,
+       task became "legacy", ``state=idle``, ``is_has_legacy_task=true``)
+       — calls ``/task/start`` with ``task_id=<legacy_task_id>`` so Tron
+       picks up exactly where it left off.
+
+    The plain ``/task/resume`` endpoint silently does nothing for legacy
+    tasks, which used to leave users stuck after a charge cycle.
+    """
 
     def __init__(self, coordinator, api, sn: str) -> None:
         """Initialize the button."""
@@ -159,7 +195,33 @@ class AirseekersResumeButton(AirseekersBaseButton):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self._api.resume_task(self._sn)
+        data = self.coordinator.data or {}
+        has_legacy = bool(data.get("has_legacy_task"))
+        legacy_id = data.get("legacy_task_id") or ""
+        state = (data.get("state") or "").lower()
+
+        # Legacy task takes priority — only happens after a dock cycle
+        # with a half-done task. resume_task would silently no-op here.
+        if has_legacy and legacy_id and state != "paused":
+            tasks = data.get("tasks") or []
+            base = tasks[0] if tasks else {}
+            map_id = data.get("current_map_id") or base.get("map_id")
+            mode = base.get("mode", 1)
+            task_units = base.get("task_units")
+            _LOGGER.info(
+                "Resume button: starting legacy task %s (map %s)",
+                legacy_id, map_id,
+            )
+            await self._api.start_task(
+                self._sn,
+                task_id=legacy_id,
+                map_id=map_id,
+                mode=mode,
+                task_units=task_units,
+            )
+        else:
+            _LOGGER.debug("Resume button: standard /task/resume")
+            await self._api.resume_task(self._sn)
         await self.coordinator.async_request_refresh()
 
 

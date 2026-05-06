@@ -91,9 +91,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         vol.Optional("sn"): cv.string,
         vol.Optional("zones"): vol.All(cv.ensure_list, [cv.string]),
         vol.Optional("mode"): vol.In(list(TASK_MODE_LOOKUP.keys())),
+        # Mirror the Airseekers app: 30-90 mm step 10, direction -90..+90 step 10.
+        # Accept slightly wider for power-users; API will reject anything truly
+        # invalid.
         vol.Optional("cut_height"): vol.All(int, vol.Range(min=20, max=120)),
         vol.Optional("cut_direction"): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=359)
+            vol.Coerce(float), vol.Range(min=-180, max=359)
         ),
         # Note: per-zone "Mowing / No mowing" toggle is `cut_mode` in the
         # API — but it's now handled automatically by the `zones` parameter

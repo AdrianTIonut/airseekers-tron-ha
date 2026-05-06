@@ -180,6 +180,32 @@ class AirseekersApi:
         except aiohttp.ClientError as err:
             raise AirseekersApiError(f"Connection error: {err}") from err
 
+    async def _put(self, path: str, payload: dict) -> dict:
+        """PUT request with automatic re-login on auth error."""
+        if not self._access_token:
+            await self.login()
+
+        session = await self._get_session()
+        url = f"{API_BASE_URL}{path}"
+
+        try:
+            async with session.put(url, json=payload, headers=self._headers()) as resp:
+                data = await resp.json()
+                if self._is_auth_error(resp.status, data):
+                    await self._relogin()
+                    # Retry once with new token
+                    async with session.put(
+                        url, json=payload, headers=self._headers()
+                    ) as retry:
+                        data = await retry.json()
+                        if self._is_auth_error(retry.status, data):
+                            raise AirseekersAuthError(
+                                "Re-login failed, credentials may be invalid"
+                            )
+                return data
+        except aiohttp.ClientError as err:
+            raise AirseekersApiError(f"Connection error: {err}") from err
+
     async def get_devices(self) -> List[Dict[str, Any]]:
         """Get list of devices."""
         data = await self._get(API_DEVICES)
@@ -256,6 +282,49 @@ class AirseekersApi:
         if data.get("code") != 0:
             return []
         return data.get("data", {}).get("list", [])
+
+    async def update_task_cut_height(self, sn: str, task: Dict[str, Any], height: int) -> bool:
+        """Update cutter_height in all task_units of a scheduled task and save it.
+
+        Sends the full task object back via PUT /api/web/device/task with the
+        new ``cutter_height`` applied to every task_unit. The task is NOT
+        started — this only persists the setting so the next Start uses it.
+
+        Args:
+            sn:     Device serial number.
+            task:   Full task dict as returned by get_device_tasks().
+            height: New cutter height in mm (typically 20–120).
+
+        Returns True on success.
+        """
+        height = max(20, min(120, int(height)))
+
+        # Deep-copy task_units and apply new height to all of them
+        updated_units = []
+        for u in task.get("task_units") or []:
+            nu = dict(u)
+            nu["cutter_height"] = height
+            updated_units.append(nu)
+
+        payload = dict(task)
+        payload["task_units"] = updated_units
+
+        _LOGGER.debug(
+            "update_task_cut_height: task_id=%s sn=%s height=%s",
+            task.get("id"), sn, height,
+        )
+        data = await self._put(API_TASK, payload)
+        if data.get("code") == 0:
+            _LOGGER.info(
+                "Cut height updated to %s mm for task %s on %s",
+                height, task.get("id"), sn,
+            )
+            return True
+        _LOGGER.error(
+            "Failed to update cut height: %s (code %s)",
+            data.get("msg"), data.get("code"),
+        )
+        return False
 
     async def get_latest_task(self, sn: str) -> Dict[str, Any]:
         """Get the most recent task definition (used by app's Quick Mow).
