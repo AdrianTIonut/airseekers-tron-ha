@@ -3,7 +3,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/AdrianTIonut/airseekers-tron-ha.svg)](https://github.com/AdrianTIonut/airseekers-tron-ha/releases)
 [![License](https://img.shields.io/github/license/AdrianTIonut/airseekers-tron-ha.svg)](LICENSE)
-![GitHub release downloads](https://img.shields.io/github/downloads/AdrianTIonut/airseekers-tron-ha/total)
+![downloads](https://img.shields.io/github/downloads/AdrianTIonut/airseekers-tron-ha/total?style=flat-square)
 ![Airseekers Tron](https://cdn.hiconsumption.com/wp-content/uploads/2024/04/Tron-360-Vision-Robotic-Lawn-Mower-0-Hero.jpg)
 
 Unofficial Home Assistant custom integration for **Airseekers Tron** robotic lawn mowers.
