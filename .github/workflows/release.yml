@@ -47,6 +47,11 @@ jobs:
           echo "==== Notes ===="
           cat release_notes.md
 
+      - name: Package the integration (HACS downloads this zip, so the downloads badge counts it)
+        run: |
+          cd custom_components/airseekers_tron
+          zip -r ../../airseekers_tron.zip . -x "__pycache__/*" "*.pyc"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -55,3 +60,4 @@ jobs:
           body_path: release_notes.md
           draft: false
           prerelease: false
+          files: airseekers_tron.zip

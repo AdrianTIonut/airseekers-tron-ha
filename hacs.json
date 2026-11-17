@@ -1,5 +1,7 @@
 {
   "name": "Airseekers Tron",
   "homeassistant": "2024.1.0",
+  "zip_release": true,
+  "filename": "airseekers_tron.zip",
   "render_readme": true
 }
